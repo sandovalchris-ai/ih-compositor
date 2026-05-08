@@ -11,9 +11,9 @@ async function getDominantColors(imageBuffer, count = 5) {
 
   const buckets = {};
   for (let i = 0; i < data.length; i += 9) {
-    const r = Math.round(data[i]     / 32) * 32;
-    const g = Math.round(data[i + 1] / 32) * 32;
-    const b = Math.round(data[i + 2] / 32) * 32;
+    const r = Math.min(255, Math.round(data[i]     / 32) * 32);
+    const g = Math.min(255, Math.round(data[i + 1] / 32) * 32);
+    const b = Math.min(255, Math.round(data[i + 2] / 32) * 32);
     const key = `${r},${g},${b}`;
     buckets[key] = (buckets[key] || 0) + 1;
   }
@@ -152,15 +152,26 @@ async function analyzeWinner(imageBuffer) {
 }
 
 function selectTemplate(analysis, assets = {}) {
-  const { isDark, leftRightContrast, topBottomContrast } = analysis;
+  const { isDark, isHighContrast, leftRightContrast, topBottomContrast, overall } = analysis;
 
   if (assets.lifestyle) return isDark ? 'dark-product' : 'lifestyle-headline';
   if (assets.model)     return isDark ? 'dark-product' : 'seasonal';
 
+  // Strong left-right split → split-column templates
   if (leftRightContrast > 35) return isDark ? 'dark-product' : 'seasonal';
-  if (isDark)                 return 'dark-product';
-  if (topBottomContrast > 25) return 'ih-bundle';
 
+  // Dark overall → dark-product
+  if (isDark) return 'dark-product';
+
+  // Very light (near-white) balanced image → ih-bundle (default product-sale layout)
+  // editorial is reserved for distinctly pinkish/colorful light backgrounds with
+  // low contrast and top-heavy text
+  if (overall > 180) return 'ih-bundle';
+
+  // Moderate top-bottom variation → ih-bundle (hero product centered)
+  if (topBottomContrast > 20) return 'ih-bundle';
+
+  // Colorful, balanced, medium-light → editorial (long-copy style)
   return 'editorial';
 }
 
