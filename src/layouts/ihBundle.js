@@ -1,15 +1,19 @@
 /**
  * ih-bundle — white/light background sale style
- * Logo · Social proof pill · Badge pill · Headline (Bebas Neue)
+ * Logo · Social proof (drawn stars) · Badge pill · Headline (Bebas Neue)
  * Hoop hero centered · Free gifts row · CTA pill · Urgency
  */
 const sharp = require('sharp');
 const { resizeContain } = require('../utils/imageLoader');
-const { F, renderTextLayer, drawRoundedRect, drawPill, drawCTA, wrapText, fitFontSize } = require('../utils/textRenderer');
+const {
+  F, renderTextLayer, drawRoundedRect, drawPill, drawCTA,
+  drawSocialProof, drawLogo, drawGroundShadow,
+  wrapText, fitFontSize,
+} = require('../utils/textRenderer');
 
 const W = 1080, H = 1080, PAD = 48;
 const HOOP_TOP = 420, HOOP_W = 620, HOOP_H = 330;
-const GIFTS_TOP = 768, GIFT_H = 148;
+const GIFTS_TOP = 770, GIFT_H = 148;
 const CTA_H = 80;
 
 async function render({ products, text, colors }) {
@@ -29,29 +33,19 @@ async function render({ products, text, colors }) {
 
   const textBuf = renderTextLayer(W, H, (ctx) => {
     // ── Logo ──
-    ctx.font      = F.logo(20);
-    ctx.fillStyle = colors.headline || '#111111';
-    ctx.textAlign = 'center';
-    ctx.fillText('INFINITY HOOP', W / 2, 48);
+    drawLogo(ctx, W, 38, { color: colors.headline || '#111111' });
 
     // ── Social proof pill ──
-    const spText = '5-STAR  Loved by 500,000+ Women';
-    const spBottom = drawPill(ctx, spText, W / 2, 62, {
-      font: F.badge(16),
-      bg: '#111111',
-      color: '#FFFFFF',
-      padX: 24,
-      height: 40,
-    });
+    const spBottom = drawSocialProof(ctx, W, 52);
 
     // ── Badge pill ──
     let badgeBottom = spBottom;
     if (text.badge) {
       badgeBottom = drawPill(ctx, text.badge, W / 2, spBottom + 10, {
-        font: F.badge(22),
-        bg: colors.badge_bg || '#FF2D55',
-        color: colors.badge_text || '#FFFFFF',
-        padX: 36,
+        font:   F.badge(22),
+        bg:     colors.badge_bg || '#FF2D55',
+        color:  colors.badge_text || '#FFFFFF',
+        padX:   36,
         height: 52,
       });
     }
@@ -63,21 +57,24 @@ async function render({ products, text, colors }) {
       const px     = fitFontSize(ctx, F.headline, upper, maxW, 112, 36, 3);
       const lineH  = px * 1.08;
       const lines  = wrapText(ctx, upper, maxW);
-      // Place first baseline below badge + breathing room
-      const hlY = badgeBottom + 22 + px * 0.75;
+      const hlY    = badgeBottom + 24 + px * 0.75;
 
+      ctx.save();
+      ctx.shadowColor   = 'rgba(0,0,0,0.1)';
+      ctx.shadowBlur    = 4;
+      ctx.shadowOffsetY = 2;
       ctx.font      = F.headline(px);
       ctx.fillStyle = colors.headline || '#111111';
       ctx.textAlign = 'center';
       lines.forEach((line, i) => ctx.fillText(line, W / 2, hlY + i * lineH));
+      ctx.restore();
 
       // ── Subheadline ──
       if (text.subheadline) {
-        const subY = hlY + lines.length * lineH + 12;
         ctx.font      = F.badge(24);
         ctx.fillStyle = '#555555';
         ctx.textAlign = 'center';
-        ctx.fillText(text.subheadline, W / 2, subY);
+        ctx.fillText(text.subheadline, W / 2, hlY + lines.length * lineH + 16);
       }
     }
 
@@ -87,24 +84,28 @@ async function render({ products, text, colors }) {
       ctx.font      = F.body(15);
       ctx.fillStyle = '#888888';
       ctx.textAlign = 'center';
-      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 16);
+      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 18);
+    }
+
+    // ── Ground shadow for hoop ──
+    if (hoopBuf) {
+      drawGroundShadow(ctx, W / 2, HOOP_TOP + HOOP_H - 8, HOOP_W * 0.75, { opacity: 0.12 });
     }
 
     // ── Urgency ──
     if (text.urgency) {
-      const urgY = H - PAD - CTA_H - 28;
       ctx.font      = F.body(17);
       ctx.fillStyle = '#888888';
       ctx.textAlign = 'center';
-      ctx.fillText(text.urgency, W / 2, urgY);
+      ctx.fillText(text.urgency, W / 2, H - PAD - CTA_H - 28);
     }
 
     // ── CTA pill ──
     if (text.cta) {
       drawCTA(ctx, text.cta, H - PAD - CTA_H, W, PAD, {
-        bg: colors.cta_bg || '#FF2D55',
-        color: colors.cta_text || '#FFFFFF',
-        height: CTA_H,
+        bg:       colors.cta_bg || '#FF2D55',
+        color:    colors.cta_text || '#FFFFFF',
+        height:   CTA_H,
         fontSize: 34,
       });
     }

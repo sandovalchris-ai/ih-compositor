@@ -5,15 +5,17 @@ const layouts = {
   'editorial':          require('./layouts/editorial'),
   'lifestyle-headline': require('./layouts/lifestyleHeadline'),
   'winner-clone':       require('./layouts/winnerClone'),
+  'before-after':       require('./layouts/beforeAfter'),
 };
 
 const LAYOUT_DESCRIPTIONS = {
-  'ih-bundle':          'White/light background — logo, social proof pill, badge, Bebas Neue headline, centered hoop, gift row, full-width CTA',
+  'ih-bundle':          'White/light background — logo, social proof (drawn stars), badge, Bebas Neue headline, centered hoop, gift row, full-width CTA',
   'dark-product':       'Dark background — badge pill, bold white headline left, body copy, hoop + gifts right, CTA button',
   'seasonal':           'Gradient/scene background — top badge banner, hoop left, headline + checkmark benefits + CTA right',
   'editorial':          'Light pink background — large headline, split product zone, long body copy, bold CTA text',
   'lifestyle-headline': 'Lifestyle photo full-bleed — white headline box, badge pill, product cutouts, callout labels',
-  'winner-clone':       'Auto-detect layout from a winner image and clone structure with new products and text',
+  'winner-clone':       'Auto-detect layout from winner image; clone structure with new products, text, and variation type',
+  'before-after':       'Split-screen transformation — greyscale before (left) vs. color after (right) + products; bottom strip headline + CTA',
 };
 
 async function composite(params) {
@@ -36,13 +38,14 @@ async function composite(params) {
 
   const normalized = {
     layout,
-    background:   params.background || null,
-    products:     params.products   || {},
-    text:         params.text       || {},
-    assets:       params.assets     || null,
-    winnerImage:  params.winner_image || null,
+    background:    params.background   || null,
+    products:      params.products     || {},
+    text:          params.text         || {},
+    assets:        params.assets       || null,
+    winnerImage:   params.winner_image || null,
+    variationType: params.variation_type || null,
     colors,
-    variation_id: params.variation_id || 1,
+    variation_id:  params.variation_id || 1,
   };
 
   return layoutModule.render(normalized);

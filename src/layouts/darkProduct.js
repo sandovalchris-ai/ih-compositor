@@ -4,7 +4,11 @@
  */
 const sharp = require('sharp');
 const { resizeContain, resizeCover } = require('../utils/imageLoader');
-const { F, renderTextLayer, drawRoundedRect, drawPill, drawCTA, wrapText, fitFontSize } = require('../utils/textRenderer');
+const {
+  F, renderTextLayer, drawRoundedRect, drawPill, drawCTA,
+  drawLogo, drawGroundShadow,
+  wrapText, fitFontSize,
+} = require('../utils/textRenderer');
 
 const W = 1080, H = 1080, PAD = 56;
 const HOOP_LEFT = 570, HOOP_W = 490, HOOP_H = 690, HOOP_TOP = 70;
@@ -13,6 +17,7 @@ const ITEM_W    = 145, ITEM_H  = 145;
 
 async function render({ products, text, colors, background, assets }) {
   const bgColor = colors.background || '#111111';
+  const leftW   = HOOP_LEFT - PAD - 16;
 
   let base;
   const bgSrc = (assets && assets.lifestyle) ? assets.lifestyle : background;
@@ -36,14 +41,9 @@ async function render({ products, text, colors, background, assets }) {
     products.cream  ? resizeContain(products.cream,  ITEM_W, ITEM_H) : null,
   ]);
 
-  const leftW = HOOP_LEFT - PAD - 16;
-
   const textBuf = renderTextLayer(W, H, (ctx) => {
     // ── Logo ──
-    ctx.font      = F.logo(20);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'left';
-    ctx.fillText('INFINITY HOOP', PAD, 50);
+    drawLogo(ctx, W, 42, { color: '#FFFFFF', align: 'left' });
 
     // ── Badge top-right ──
     if (text.badge) {
@@ -51,9 +51,14 @@ async function render({ products, text, colors, background, assets }) {
       ctx.font = bFont;
       const bW = ctx.measureText(text.badge).width + 40;
       const bX = W - bW - PAD;
+      ctx.save();
+      ctx.shadowColor   = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur    = 10;
+      ctx.shadowOffsetY = 3;
       ctx.fillStyle = colors.badge_bg || '#FF2D55';
-      drawRoundedRect(ctx, bX, 26, bW, 44, 22);
+      drawRoundedRect(ctx, bX, 24, bW, 46, 23);
       ctx.fill();
+      ctx.restore();
       ctx.fillStyle = colors.badge_text || '#FFFFFF';
       ctx.textAlign = 'center';
       ctx.fillText(text.badge, bX + bW / 2, 55);
@@ -64,21 +69,25 @@ async function render({ products, text, colors, background, assets }) {
       const upper = text.headline.toUpperCase();
       const px    = fitFontSize(ctx, F.headline, upper, leftW, 108, 36, 4);
       const lineH = px * 1.08;
+      ctx.save();
+      ctx.shadowColor   = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur    = 6;
+      ctx.shadowOffsetY = 3;
       ctx.font      = F.headline(px);
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'left';
       wrapText(ctx, upper, leftW).forEach((line, i) =>
         ctx.fillText(line, PAD, 140 + i * lineH));
+      ctx.restore();
     }
 
     // ── Body copy ──
     if (text.body) {
-      const paragraphs = text.body.split('\n').filter(Boolean);
       ctx.font      = F.body(21);
       ctx.fillStyle = 'rgba(255,255,255,0.82)';
       ctx.textAlign = 'left';
       let curY = 500;
-      paragraphs.slice(0, 5).forEach((para) => {
+      text.body.split('\n').filter(Boolean).slice(0, 5).forEach((para) => {
         wrapText(ctx, para, leftW).forEach((line) => {
           if (curY < H - 200) { ctx.fillText(line, PAD, curY); curY += 32; }
         });
@@ -94,12 +103,22 @@ async function render({ products, text, colors, background, assets }) {
       ctx.fillText(text.subheadline, PAD, 690);
     }
 
+    // ── Ground shadow for hoop ──
+    if (hoopBuf) {
+      drawGroundShadow(ctx, HOOP_LEFT + HOOP_W / 2, HOOP_TOP + HOOP_H - 20, HOOP_W * 0.7, { opacity: 0.2 });
+    }
+
     // ── CTA ──
     if (text.cta) {
       const ctaY = H - 156;
+      ctx.save();
+      ctx.shadowColor   = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur    = 20;
+      ctx.shadowOffsetY = 5;
       ctx.fillStyle = colors.cta_bg || '#FF2D55';
       drawRoundedRect(ctx, PAD, ctaY, leftW, 72, 36);
       ctx.fill();
+      ctx.restore();
       ctx.font      = F.cta(28);
       ctx.fillStyle = colors.cta_text || '#FFFFFF';
       ctx.textAlign = 'center';
