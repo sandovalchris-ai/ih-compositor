@@ -24,6 +24,55 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
 
+// ── GET /debug-fonts ─────────────────────────────────────────────────────────
+app.get('/debug-fonts', (req, res) => {
+  try {
+    const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
+    const path = require('path');
+    const fs = require('fs');
+
+    const FONT_BASE = path.join(__dirname, '../node_modules/@fontsource');
+    const results = {};
+
+    const testFile = (relPath, family) => {
+      const full = path.join(FONT_BASE, relPath);
+      const exists = fs.existsSync(full);
+      let regResult = null;
+      let regError = null;
+      if (exists) {
+        try {
+          regResult = String(GlobalFonts.registerFromPath(full, family));
+        } catch (e) {
+          regError = e.message;
+        }
+      }
+      return { exists, path: full, regResult, regError };
+    };
+
+    results.woff2_oswald = testFile('oswald/files/oswald-latin-700-normal.woff2', 'TestOswaldW2');
+    results.woff_oswald  = testFile('oswald/files/oswald-latin-700-normal.woff',  'TestOswaldW1');
+    results.woff2_roboto = testFile('roboto/files/roboto-latin-700-normal.woff2', 'TestRobotoW2');
+    results.woff_roboto  = testFile('roboto/files/roboto-latin-400-normal.woff',  'TestRobotoW1');
+
+    const canvas = createCanvas(400, 100);
+    const ctx = canvas.getContext('2d');
+    const measureTests = {};
+
+    ['TestOswaldW2', 'TestOswaldW1', 'TestRobotoW2', 'TestRobotoW1', 'IHImpact', 'IHBold', 'IHRegular', 'sans-serif'].forEach((fam) => {
+      ctx.font = `700 40px ${fam}`;
+      measureTests[fam] = ctx.measureText('TEST HELLO').width;
+    });
+
+    results.measureText = measureTests;
+    results.families = GlobalFonts.families.map(f => f.family);
+    results.platform = process.platform;
+
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ── GET /layouts ─────────────────────────────────────────────────────────────
 app.get('/layouts', (req, res) => {
   res.json({ layouts: getLayouts() });
