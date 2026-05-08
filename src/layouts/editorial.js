@@ -1,25 +1,23 @@
 /**
- * editorial — light pink/white, long copy, products split center (IH11 reference)
+ * editorial — light pink/white, long copy, products split center
  */
 const sharp = require('sharp');
 const { resizeContain } = require('../utils/imageLoader');
 const { F, renderTextLayer, drawRoundedRect, wrapText, fitFontSize } = require('../utils/textRenderer');
 
 const W = 1080, H = 1080, PAD = 56;
-const PROD_TOP = 235, PROD_H = 295, SLOT_W = 450;
-const LEFT_X = 56, RIGHT_X = 562;
-const BODY_Y  = PROD_TOP + PROD_H + 28;
+const PROD_TOP = 220, PROD_H = 310, SLOT_W = 460;
+const LEFT_X = 56, RIGHT_X = 556;
+const BODY_Y  = PROD_TOP + PROD_H + 32;
 const GIFT_W  = 136, GIFT_H  = 180;
 
 async function render({ products, text, colors }) {
   const bgColor = colors.background || '#FFF0F3';
 
-  // ── 1. Background ──────────────────────────────────────────────────────────
   const base = await sharp({
     create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
   }).png().toBuffer();
 
-  // ── 2. Products ────────────────────────────────────────────────────────────
   const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
     products.hoop   ? resizeContain(products.hoop,   SLOT_W, PROD_H) : null,
     products.bundle ? resizeContain(products.bundle,  SLOT_W, PROD_H) : null,
@@ -28,60 +26,58 @@ async function render({ products, text, colors }) {
     products.cream  ? resizeContain(products.cream,  GIFT_W, GIFT_H) : null,
   ]);
 
-  // ── 3. Text layer ──────────────────────────────────────────────────────────
   const textBuf = renderTextLayer(W, H, (ctx) => {
     ctx.textAlign = 'center';
 
-    // Headline — auto-size, max 3 lines
+    // ── Headline (Bebas Neue) ──
     if (text.headline) {
       const upper = text.headline.toUpperCase();
-      const px    = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 54, 20, 3);
+      const px    = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 96, 24, 2);
       ctx.font      = F.headline(px);
       ctx.fillStyle = colors.headline || '#111111';
       wrapText(ctx, upper, W - PAD * 2).forEach((line, i) =>
-        ctx.fillText(line, W / 2, 80 + i * px * 1.2));
+        ctx.fillText(line, W / 2, 88 + i * px * 1.08));
     }
 
-    // Subheadline
+    // ── Subheadline ──
     if (text.subheadline) {
-      ctx.font      = F.badge(26);
+      ctx.font      = F.badge(24);
       ctx.fillStyle = '#444444';
-      ctx.fillText(text.subheadline, W / 2, 200);
+      ctx.fillText(text.subheadline, W / 2, 196);
     }
 
-    // Divider
+    // ── Divider ──
     ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.lineWidth   = 1.5;
     ctx.beginPath();
-    ctx.moveTo(PAD, PROD_TOP - 14);
-    ctx.lineTo(W - PAD, PROD_TOP - 14);
+    ctx.moveTo(PAD, PROD_TOP - 12);
+    ctx.lineTo(W - PAD, PROD_TOP - 12);
     ctx.stroke();
 
-    // Body copy below products
+    // ── Body copy ──
     if (text.body) {
       const paragraphs = text.body.split('\n').filter(Boolean);
       ctx.font      = F.body(21);
       ctx.fillStyle = '#333333';
       ctx.textAlign = 'left';
-      let curY      = BODY_Y;
-      paragraphs.slice(0, 5).forEach((para) => {
+      let curY = BODY_Y;
+      paragraphs.slice(0, 6).forEach((para) => {
         wrapText(ctx, para, W - PAD * 2).forEach((line) => {
-          if (curY < H - 90) { ctx.fillText(line, PAD, curY); curY += 30; }
+          if (curY < H - 100) { ctx.fillText(line, PAD, curY); curY += 30; }
         });
-        curY += 6;
+        curY += 8;
       });
     }
 
-    // CTA — bold colored text at bottom, no button
+    // ── CTA — bold colored text at bottom ──
     if (text.cta) {
-      ctx.font      = F.cta(34);
+      ctx.font      = F.cta(38);
       ctx.fillStyle = colors.badge_bg || '#FF2D55';
       ctx.textAlign = 'center';
       ctx.fillText(text.cta.toUpperCase(), W / 2, H - PAD);
     }
   });
 
-  // ── 4. Composite ──────────────────────────────────────────────────────────
   const composites = [];
   const hasLeft  = bundleBuf || beltBuf || teaBuf || creamBuf;
   const hasRight = !!hoopBuf;

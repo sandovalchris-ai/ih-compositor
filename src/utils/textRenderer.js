@@ -2,48 +2,49 @@ const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
 const path = require('path');
 
 // ── Font registration ─────────────────────────────────────────────────────────
-// Bundled via @fontsource — work identically on macOS, Linux (Railway), and CI.
-// Oswald is a condensed grotesque — visually close to Impact.
-// Roboto is a neutral sans-serif — visually close to Arial.
 const FONT_BASE = path.join(__dirname, '../../node_modules/@fontsource');
 
 function reg(relPath, family) {
   try {
-    const result = GlobalFonts.registerFromPath(path.join(FONT_BASE, relPath), family);
-    return !!result;
+    GlobalFonts.registerFromPath(path.join(FONT_BASE, relPath), family);
   } catch (e) {
     console.warn(`Font registration failed for ${family}:`, e.message);
-    return false;
   }
 }
 
-// Register all weights we use. Register under stable alias names so layouts
-// don't need to know the underlying package name.
-reg('oswald/files/oswald-latin-700-normal.woff2', 'IHImpact');   // headline / badge heavy
-reg('oswald/files/oswald-latin-600-normal.woff2', 'IHImpact');   // same family, 600
-reg('oswald/files/oswald-latin-500-normal.woff2', 'IHImpact');   // same family, 500
-reg('roboto/files/roboto-latin-700-normal.woff2', 'IHBold');     // badge text, CTA, UI labels
-reg('roboto/files/roboto-latin-400-normal.woff2', 'IHRegular');  // body copy
+// IHDisplay  → Bebas Neue 400 — ultra-condensed, looks like Impact 900
+reg('bebas-neue/files/bebas-neue-latin-400-normal.woff2', 'IHDisplay');
+reg('bebas-neue/files/bebas-neue-latin-ext-400-normal.woff2', 'IHDisplay');
 
-// Convenience font strings used by layout files
+// IHImpact   → Oswald 700 — condensed bold, fallback headlines
+reg('oswald/files/oswald-latin-700-normal.woff2', 'IHImpact');
+reg('oswald/files/oswald-latin-600-normal.woff2', 'IHImpact');
+
+// IHBold     → Roboto 700 — badge pills, CTA text, labels
+reg('roboto/files/roboto-latin-700-normal.woff2', 'IHBold');
+
+// IHRegular  → Roboto 400 — body copy, fine print
+reg('roboto/files/roboto-latin-400-normal.woff2', 'IHRegular');
+
+// Font strings used by all layout files
 const F = {
-  headline: (px)   => `700 ${px}px IHImpact`,   // large headline — Oswald Bold
-  badge:    (px)   => `700 ${px}px IHBold`,      // badge pill / social proof — Roboto Bold
-  cta:      (px)   => `700 ${px}px IHBold`,      // CTA button
-  body:     (px)   => `400 ${px}px IHRegular`,   // body copy
-  logo:     (px)   => `700 ${px}px IHBold`,      // logo wordmark
+  headline: (px) => `400 ${px}px IHDisplay`,   // Bebas Neue — ultra-condensed
+  badge:    (px) => `700 ${px}px IHBold`,       // Roboto Bold — badge pills, callouts
+  cta:      (px) => `700 ${px}px IHBold`,       // Roboto Bold — CTA buttons
+  body:     (px) => `400 ${px}px IHRegular`,    // Roboto Regular — body copy
+  logo:     (px) => `700 ${px}px IHBold`,       // Roboto Bold — logo wordmark
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function hexToRgba(hex, alpha = 1) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0,2), 16);
+  const g = parseInt(c.slice(2,4), 16);
+  const b = parseInt(c.slice(4,6), 16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-/** Wrap text into lines that fit within maxWidth. Returns string[]. */
 function wrapText(ctx, text, maxWidth) {
   const words = text.split(' ');
   const lines = [];
@@ -61,7 +62,6 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-/** Auto-reduce fontSize until text wraps to ≤ maxLines lines within maxWidth. */
 function fitFontSize(ctx, fontFn, text, maxWidth, startPx, minPx = 14, maxLines = 3) {
   let px = startPx;
   while (px >= minPx) {
@@ -72,25 +72,70 @@ function fitFontSize(ctx, fontFn, text, maxWidth, startPx, minPx = 14, maxLines 
   return px;
 }
 
-/** Draw a filled rounded rectangle path. */
 function drawRoundedRect(ctx, x, y, w, h, r) {
+  const safeR = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(x + safeR, y);
+  ctx.lineTo(x + w - safeR, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + safeR);
+  ctx.lineTo(x + w, y + h - safeR);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - safeR, y + h);
+  ctx.lineTo(x + safeR, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - safeR);
+  ctx.lineTo(x, y + safeR);
+  ctx.quadraticCurveTo(x, y, x + safeR, y);
   ctx.closePath();
 }
 
-/**
- * Render a 1080×1080 transparent text layer.
- * drawFn receives (ctx, canvas). Returns a PNG Buffer ready for Sharp composite.
- */
+// Draw bold pill badge (colored bg + white text), returns bottom Y
+function drawPill(ctx, text, x, y, opts = {}) {
+  const {
+    font = F.badge(22),
+    bg = '#FF2D55',
+    color = '#FFFFFF',
+    padX = 40,
+    height = 52,
+    align = 'center',
+    maxWidth,
+  } = opts;
+
+  ctx.font = font;
+  let tw = ctx.measureText(text).width;
+  if (maxWidth) tw = Math.min(tw, maxWidth - padX * 2);
+  const w = tw + padX * 2;
+  const drawX = align === 'center' ? x - w / 2 : x;
+
+  ctx.fillStyle = bg;
+  drawRoundedRect(ctx, drawX, y, w, height, height / 2);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, drawX + w / 2, y + height / 2 + 8);
+
+  return y + height;
+}
+
+// Draw full-width CTA button
+function drawCTA(ctx, text, y, W, PAD, opts = {}) {
+  const {
+    bg = '#FF2D55',
+    color = '#FFFFFF',
+    height = 80,
+    fontSize = 32,
+  } = opts;
+
+  ctx.fillStyle = bg;
+  drawRoundedRect(ctx, PAD, y, W - PAD * 2, height, height / 2);
+  ctx.fill();
+  ctx.font = F.cta(fontSize);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text.toUpperCase(), W / 2, y + height / 2 + 11);
+
+  return y + height;
+}
+
 function renderTextLayer(width, height, drawFn) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
@@ -98,4 +143,13 @@ function renderTextLayer(width, height, drawFn) {
   return canvas.toBuffer('image/png');
 }
 
-module.exports = { F, hexToRgba, wrapText, fitFontSize, renderTextLayer, drawRoundedRect };
+module.exports = {
+  F,
+  hexToRgba,
+  wrapText,
+  fitFontSize,
+  drawRoundedRect,
+  drawPill,
+  drawCTA,
+  renderTextLayer,
+};

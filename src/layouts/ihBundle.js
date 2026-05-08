@@ -1,39 +1,24 @@
 /**
- * ih-bundle — white/light background sale style (IH8 reference)
- *
- * Structure top→bottom:
- *   Logo · Social proof pill · Badge pill · Headline
- *   Hoop (hero, centered) · Free gifts row
- *   CTA pill · Urgency line
+ * ih-bundle — white/light background sale style
+ * Logo · Social proof pill · Badge pill · Headline (Bebas Neue)
+ * Hoop hero centered · Free gifts row · CTA pill · Urgency
  */
 const sharp = require('sharp');
 const { resizeContain } = require('../utils/imageLoader');
-const { F, renderTextLayer, drawRoundedRect, wrapText, fitFontSize } = require('../utils/textRenderer');
+const { F, renderTextLayer, drawRoundedRect, drawPill, drawCTA, wrapText, fitFontSize } = require('../utils/textRenderer');
 
 const W = 1080, H = 1080, PAD = 48;
-// Vertical zones (pixel-exact so nothing overlaps):
-//   Logo:         y=42
-//   Social proof: y=56–84 (28px pill)
-//   Badge:        y=92–130 (38px pill)
-//   Headline:     y=152+ baseline (top of 76px caps = 152–58 = 94 > 130 ✓)
-//   Hoop:         y=415–755
-//   Gifts:        y=763–911
-//   Urgency:      y=916
-//   CTA:          y=928–1000
-const BADGE_BOTTOM = 158;   // badge pill bottom (bY=114 + h=44)
-const HL_Y_START   = 250;   // headline first-line baseline; cap-top ≈ 250-58 = 192 > BADGE_BOTTOM ✓
-const HOOP_TOP = 420, HOOP_W = 600, HOOP_H = 330;
-const GIFTS_TOP = 763, GIFT_H = 148;
+const HOOP_TOP = 420, HOOP_W = 620, HOOP_H = 330;
+const GIFTS_TOP = 768, GIFT_H = 148;
+const CTA_H = 80;
 
 async function render({ products, text, colors }) {
   const bgColor = colors.background || '#FFFFFF';
 
-  // ── 1. Background ──────────────────────────────────────────────────────────
   const base = await sharp({
     create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
   }).png().toBuffer();
 
-  // ── 2. Product images (parallel) ──────────────────────────────────────────
   const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
     products.hoop   ? resizeContain(products.hoop,   HOOP_W, HOOP_H) : null,
     products.bundle ? resizeContain(products.bundle,  520,    GIFT_H) : null,
@@ -42,102 +27,102 @@ async function render({ products, text, colors }) {
     products.cream  ? resizeContain(products.cream,   230,    GIFT_H) : null,
   ]);
 
-  // ── 3. Text layer ──────────────────────────────────────────────────────────
   const textBuf = renderTextLayer(W, H, (ctx) => {
-    // Logo
-    ctx.font      = F.logo(22);
-    ctx.fillStyle = '#111111';
+    // ── Logo ──
+    ctx.font      = F.logo(20);
+    ctx.fillStyle = colors.headline || '#111111';
     ctx.textAlign = 'center';
-    ctx.fillText('INFINITY HOOP', W / 2, 52);
+    ctx.fillText('INFINITY HOOP', W / 2, 48);
 
-    // Social proof pill
+    // ── Social proof pill ──
     const spText = '5-STAR  Loved by 500,000+ Women';
-    ctx.font = F.badge(17);
-    const spW = ctx.measureText(spText).width + 40;
-    ctx.fillStyle = '#111111';
-    drawRoundedRect(ctx, (W - spW) / 2, 66, spW, 36, 18);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'center';
-    ctx.fillText(spText, W / 2, 90);
+    const spBottom = drawPill(ctx, spText, W / 2, 62, {
+      font: F.badge(16),
+      bg: '#111111',
+      color: '#FFFFFF',
+      padX: 24,
+      height: 40,
+    });
 
-    // Badge pill
+    // ── Badge pill ──
+    let badgeBottom = spBottom;
     if (text.badge) {
-      ctx.font = F.badge(22);
-      const bW = ctx.measureText(text.badge).width + 48;
-      const bY = 114;
-      ctx.fillStyle = colors.badge_bg || '#FF2D55';
-      drawRoundedRect(ctx, (W - bW) / 2, bY, bW, 44, 22);
-      ctx.fill();
-      ctx.fillStyle = colors.badge_text || '#FFFFFF';
-      ctx.textAlign = 'center';
-      ctx.fillText(text.badge, W / 2, bY + 29);
+      badgeBottom = drawPill(ctx, text.badge, W / 2, spBottom + 10, {
+        font: F.badge(22),
+        bg: colors.badge_bg || '#FF2D55',
+        color: colors.badge_text || '#FFFFFF',
+        padX: 36,
+        height: 52,
+      });
     }
 
-    // Headline — auto-size, max 3 lines
+    // ── Headline (Bebas Neue) ──
     if (text.headline) {
-      const upper = text.headline.toUpperCase();
-      const maxW  = W - PAD * 2;
-      const px    = fitFontSize(ctx, F.headline, upper, maxW, 76, 28, 3);
+      const upper  = text.headline.toUpperCase();
+      const maxW   = W - PAD * 2;
+      const px     = fitFontSize(ctx, F.headline, upper, maxW, 112, 36, 3);
+      const lineH  = px * 1.08;
+      const lines  = wrapText(ctx, upper, maxW);
+      // Place first baseline below badge + breathing room
+      const hlY = badgeBottom + 22 + px * 0.75;
+
       ctx.font      = F.headline(px);
       ctx.fillStyle = colors.headline || '#111111';
       ctx.textAlign = 'center';
-      wrapText(ctx, upper, maxW).forEach((line, i) =>
-        ctx.fillText(line, W / 2, HL_Y_START + i * px * 1.15));
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, hlY + i * lineH));
+
+      // ── Subheadline ──
+      if (text.subheadline) {
+        const subY = hlY + lines.length * lineH + 12;
+        ctx.font      = F.badge(24);
+        ctx.fillStyle = '#555555';
+        ctx.textAlign = 'center';
+        ctx.fillText(text.subheadline, W / 2, subY);
+      }
     }
 
-    // Subheadline
-    if (text.subheadline) {
-      ctx.font      = F.badge(26);
-      ctx.fillStyle = '#555555';
-      ctx.textAlign = 'center';
-      ctx.fillText(text.subheadline, W / 2, 340);
-    }
-
-    // "FREE GIFTS INCLUDED" label
+    // ── "FREE GIFTS INCLUDED" label ──
     const hasGifts = bundleBuf || beltBuf || teaBuf || creamBuf;
     if (hasGifts) {
-      ctx.font      = F.body(16);
+      ctx.font      = F.body(15);
       ctx.fillStyle = '#888888';
       ctx.textAlign = 'center';
-      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 14);
+      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 16);
     }
 
-    // Urgency
+    // ── Urgency ──
     if (text.urgency) {
+      const urgY = H - PAD - CTA_H - 28;
       ctx.font      = F.body(17);
       ctx.fillStyle = '#888888';
       ctx.textAlign = 'center';
-      ctx.fillText(text.urgency, W / 2, H - PAD - 72 - 22);
+      ctx.fillText(text.urgency, W / 2, urgY);
     }
 
-    // CTA pill — full-width at bottom
+    // ── CTA pill ──
     if (text.cta) {
-      const ctaY = H - 72 - PAD;
-      ctx.fillStyle = colors.cta_bg || '#FF2D55';
-      drawRoundedRect(ctx, PAD, ctaY, W - PAD * 2, 72, 36);
-      ctx.fill();
-      ctx.font      = F.cta(28);
-      ctx.fillStyle = colors.cta_text || '#FFFFFF';
-      ctx.textAlign = 'center';
-      ctx.fillText(text.cta.toUpperCase(), W / 2, ctaY + 46);
+      drawCTA(ctx, text.cta, H - PAD - CTA_H, W, PAD, {
+        bg: colors.cta_bg || '#FF2D55',
+        color: colors.cta_text || '#FFFFFF',
+        height: CTA_H,
+        fontSize: 34,
+      });
     }
   });
 
-  // ── 4. Composite: bg → hoop → gifts → text ────────────────────────────────
   const composites = [];
 
-  if (hoopBuf)   composites.push({ input: hoopBuf,   top: HOOP_TOP,  left: Math.round((W - HOOP_W) / 2) });
+  if (hoopBuf) composites.push({ input: hoopBuf, top: HOOP_TOP, left: Math.round((W - HOOP_W) / 2) });
 
   if (bundleBuf) {
     composites.push({ input: bundleBuf, top: GIFTS_TOP, left: Math.round((W - 520) / 2) });
   } else {
-    const items  = [beltBuf, teaBuf, creamBuf].filter(Boolean);
-    const itemW  = 230, gap = 20;
-    let leftX    = Math.round((W - (items.length * itemW + (items.length - 1) * gap)) / 2);
+    const items = [beltBuf, teaBuf, creamBuf].filter(Boolean);
+    const itemW = 230, gap = 20;
+    let lx = Math.round((W - (items.length * itemW + (items.length - 1) * gap)) / 2);
     items.forEach((buf) => {
-      composites.push({ input: buf, top: GIFTS_TOP, left: leftX });
-      leftX += itemW + gap;
+      composites.push({ input: buf, top: GIFTS_TOP, left: lx });
+      lx += itemW + gap;
     });
   }
 

@@ -5,137 +5,36 @@ const { composite, getLayouts } = require('./compositor');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MAX_BATCH_SIZE = parseInt(process.env.MAX_BATCH_SIZE || '25', 10);
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
 
-// ── Middleware ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS);
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
-// Increase JSON body limit for base64 images (up to 50MB per request)
 app.use(express.json({ limit: '50mb' }));
 
-// ── GET /health ─────────────────────────────────────────────────────────────
+// ── GET /health ───────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0' });
+  res.json({ status: 'ok', version: '2.0.0' });
 });
 
-// ── GET /debug-fonts ─────────────────────────────────────────────────────────
-app.get('/debug-fonts', (req, res) => {
-  try {
-    const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
-    const path = require('path');
-    const fs = require('fs');
-
-    const FONT_BASE = path.join(__dirname, '../node_modules/@fontsource');
-    const results = {};
-
-    const testFile = (relPath, family) => {
-      const full = path.join(FONT_BASE, relPath);
-      const exists = fs.existsSync(full);
-      let regResult = null;
-      let regError = null;
-      if (exists) {
-        try {
-          regResult = String(GlobalFonts.registerFromPath(full, family));
-        } catch (e) {
-          regError = e.message;
-        }
-      }
-      return { exists, path: full, regResult, regError };
-    };
-
-    results.woff2_oswald = testFile('oswald/files/oswald-latin-700-normal.woff2', 'TestOswaldW2');
-    results.woff_oswald  = testFile('oswald/files/oswald-latin-700-normal.woff',  'TestOswaldW1');
-    results.woff2_roboto = testFile('roboto/files/roboto-latin-700-normal.woff2', 'TestRobotoW2');
-    results.woff_roboto  = testFile('roboto/files/roboto-latin-400-normal.woff',  'TestRobotoW1');
-
-    const canvas = createCanvas(400, 100);
-    const ctx = canvas.getContext('2d');
-    const measureTests = {};
-
-    ['TestOswaldW2', 'TestOswaldW1', 'TestRobotoW2', 'TestRobotoW1', 'IHImpact', 'IHBold', 'IHRegular', 'sans-serif'].forEach((fam) => {
-      ctx.font = `700 40px ${fam}`;
-      measureTests[fam] = ctx.measureText('TEST HELLO').width;
-    });
-
-    results.measureText = measureTests;
-    results.families = GlobalFonts.families.map(f => f.family);
-    results.platform = process.platform;
-
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ── GET /debug-render ─────────────────────────────────────────────────────────
-app.get('/debug-render', async (req, res) => {
-  try {
-    const { createCanvas } = require('@napi-rs/canvas');
-    const sharp = require('sharp');
-
-    // TEST A: opaque canvas (debug sanity)
-    const canvasA = createCanvas(400, 100);
-    const ctxA = canvasA.getContext('2d');
-    ctxA.fillStyle = '#FFFFFF'; ctxA.fillRect(0, 0, 400, 100);
-    ctxA.fillStyle = '#FF0000'; ctxA.fillRect(5, 5, 390, 40);
-    ctxA.font = '700 30px IHBold'; ctxA.fillStyle = '#FFFFFF';
-    ctxA.fillText('OPAQUE CANVAS', 10, 35);
-    ctxA.fillStyle = '#000000'; ctxA.font = '700 26px IHImpact';
-    ctxA.fillText('IMPACT BELOW', 10, 80);
-    const bufA = canvasA.toBuffer('image/png');
-
-    // TEST B: TRANSPARENT canvas (exactly like renderTextLayer) composited via Sharp
-    const canvasB = createCanvas(400, 100);
-    const ctxB = canvasB.getContext('2d');
-    // NO background fill — transparent canvas
-    ctxB.fillStyle = '#FF0000'; ctxB.fillRect(5, 5, 390, 40);
-    ctxB.font = '700 30px IHBold'; ctxB.fillStyle = '#FFFFFF';
-    ctxB.fillText('TRANSPARENT CANVAS', 10, 35);
-    ctxB.fillStyle = '#000000'; ctxB.font = '700 26px IHImpact';
-    ctxB.fillText('TEXT ON TRANSPARENT', 10, 80);
-    const bufB = canvasB.toBuffer('image/png');
-
-    // Composite B onto a gray Sharp base (the real-world path)
-    const baseB = await sharp({ create: { width: 400, height: 100, channels: 4, background: { r:220, g:220, b:220, alpha:1 } } }).png().toBuffer();
-    const compositeB = await sharp(baseB).composite([{ input: bufB, top: 0, left: 0 }]).png().toBuffer();
-
-    // Stack A and compositeB into one tall image for comparison
-    const combined = await sharp({ create: { width: 400, height: 210, channels: 4, background: { r:255, g:255, b:255, alpha:1 } } })
-      .png().toBuffer();
-    const result = await sharp(combined).composite([
-      { input: bufA, top: 0, left: 0 },
-      { input: compositeB, top: 110, left: 0 },
-    ]).png().toBuffer();
-
-    res.setHeader('Content-Type', 'image/png');
-    res.send(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── GET /layouts ─────────────────────────────────────────────────────────────
+// ── GET /layouts ──────────────────────────────────────────────────────────────
 app.get('/layouts', (req, res) => {
   res.json({ layouts: getLayouts() });
 });
 
 // ── POST /composite ───────────────────────────────────────────────────────────
+// Body: { layout, products, text, colors, assets, background, variation_id }
 app.post('/composite', async (req, res) => {
   try {
     const params = req.body;
-
     if (!params || typeof params !== 'object') {
       return res.status(400).json({ error: 'Request body must be a JSON object' });
     }
-
     const pngBuffer = await composite(params);
-
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `inline; filename="composite_${params.variation_id || 1}.png"`);
     res.send(pngBuffer);
@@ -145,26 +44,83 @@ app.post('/composite', async (req, res) => {
   }
 });
 
-// ── POST /composite-batch ─────────────────────────────────────────────────────
-app.post('/composite-batch', async (req, res) => {
+// ── POST /composite-from-winner ───────────────────────────────────────────────
+// Body: {
+//   winner_image: base64,          ← analyzed to detect layout type
+//   products: { hoop, bundle, belt, tea, cream },
+//   assets: { model, lifestyle, before_after },
+//   text: { headline, body, offer, cta, badge, urgency },
+//   colors: { bg, headline, cta_bg, cta_text },
+//   variation_id: number
+// }
+app.post('/composite-from-winner', async (req, res) => {
   try {
-    const items = req.body;
+    const {
+      winner_image,
+      products = {},
+      assets   = {},
+      text     = {},
+      colors   = {},
+      variation_id = 1,
+    } = req.body || {};
 
-    if (!Array.isArray(items)) {
-      return res.status(400).json({ error: 'Request body must be an array of composite requests' });
-    }
-
-    if (items.length === 0) {
-      return res.status(400).json({ error: 'Batch must contain at least 1 item' });
-    }
-
-    if (items.length > MAX_BATCH_SIZE) {
+    if (!winner_image && !assets.lifestyle && !assets.model) {
       return res.status(400).json({
-        error: `Batch size ${items.length} exceeds maximum of ${MAX_BATCH_SIZE}`,
+        error: 'Provide winner_image (base64) or at least one asset (lifestyle/model) to determine layout',
       });
     }
 
-    // Process all composites (in parallel with concurrency cap)
+    // Normalize colors
+    const normalizedColors = {
+      background: colors.bg || colors.background || '#FFFFFF',
+      headline:   colors.headline || '#111111',
+      badge_bg:   colors.cta_bg   || '#FF2D55',
+      badge_text: '#FFFFFF',
+      cta_bg:     colors.cta_bg   || '#FF2D55',
+      cta_text:   colors.cta_text || '#FFFFFF',
+      ...colors,
+    };
+
+    // Normalize text (support 'offer' as alias for 'badge')
+    const normalizedText = { ...text };
+    if (normalizedText.offer && !normalizedText.badge) {
+      normalizedText.badge = normalizedText.offer;
+    }
+
+    const pngBuffer = await composite({
+      layout:       'winner-clone',
+      winner_image,
+      products,
+      assets,
+      text:         normalizedText,
+      colors:       normalizedColors,
+      variation_id,
+    });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="winner_clone_${variation_id}.png"`);
+    res.send(pngBuffer);
+  } catch (err) {
+    console.error('Winner clone error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /composite-batch ─────────────────────────────────────────────────────
+// Array of composite requests. Items with winner_image are routed to winner-clone.
+app.post('/composite-batch', async (req, res) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Request body must be an array' });
+    }
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'Batch must have at least 1 item' });
+    }
+    if (items.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({ error: `Batch size ${items.length} exceeds max ${MAX_BATCH_SIZE}` });
+    }
+
     const CONCURRENCY = 5;
     const results = [];
 
@@ -173,8 +129,12 @@ app.post('/composite-batch', async (req, res) => {
       const chunkResults = await Promise.all(
         chunk.map(async (item, idx) => {
           const globalIdx = i + idx;
+          // Auto-route to winner-clone when winner_image is present
+          const params = item.winner_image
+            ? { ...item, layout: 'winner-clone' }
+            : item;
           try {
-            const buf = await composite(item);
+            const buf = await composite(params);
             return { success: true, buf, item, idx: globalIdx };
           } catch (err) {
             return { success: false, error: err.message, item, idx: globalIdx };
@@ -184,33 +144,21 @@ app.post('/composite-batch', async (req, res) => {
       results.push(...chunkResults);
     }
 
-    // Build ZIP
     const zip = new JSZip();
-
     results.forEach(({ success, buf, item, idx, error }) => {
-      const varId = item.variation_id || idx + 1;
-      const layout = item.layout || 'ih-bundle';
-      const filename = `variation_${String(varId).padStart(2, '0')}_${layout}.png`;
-
+      const varId  = item.variation_id || idx + 1;
+      const layout = item.winner_image ? 'winner-clone' : (item.layout || 'ih-bundle');
+      const fname  = `variation_${String(varId).padStart(2, '0')}_${layout}.png`;
       if (success) {
-        zip.file(filename, buf);
+        zip.file(fname, buf);
       } else {
-        // Add an error log file instead of breaking the whole batch
-        zip.file(
-          filename.replace('.png', '_ERROR.txt'),
-          `Error generating variation ${varId}:\n${error}`
-        );
+        zip.file(fname.replace('.png', '_ERROR.txt'), `Error generating variation ${varId}:\n${error}`);
       }
     });
 
-    const zipBuffer = await zip.generateAsync({
-      type: 'nodebuffer',
-      compression: 'DEFLATE',
-      compressionOptions: { level: 6 },
-    });
-
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     const successCount = results.filter(r => r.success).length;
-    const errorCount = results.filter(r => !r.success).length;
+    const errorCount   = results.filter(r => !r.success).length;
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', 'attachment; filename="ih_composites.zip"');
@@ -223,9 +171,88 @@ app.post('/composite-batch', async (req, res) => {
   }
 });
 
+// ── GET /trends ───────────────────────────────────────────────────────────────
+// ?keywords=belly+fat,hormonal+weight,menopause
+// Uses Google Trends unofficial API. Rate-limited; may return 429 from Google.
+// Meta Ad Library is NOT included — requires Facebook API credentials.
+app.get('/trends', async (req, res) => {
+  const raw = (req.query.keywords || 'weighted hoop,belly fat,weight loss,hormonal belly,menopause weight');
+  const keywords = raw.split(',').map(k => k.trim()).filter(Boolean).slice(0, 5);
+
+  try {
+    const googleTrends = require('google-trends-api');
+
+    // Fetch interest over time for all keywords (last 90 days, US)
+    const interestRaw = await googleTrends.interestOverTime({
+      keyword: keywords,
+      startTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+      geo: 'US',
+    });
+
+    const interestData = JSON.parse(interestRaw);
+    const timeline = (interestData.default?.timelineData || []).slice(-12); // last 12 data points
+
+    // Compute average interest per keyword
+    const scores = keywords.map((kw, i) => {
+      const avg = timeline.length
+        ? Math.round(timeline.reduce((sum, pt) => sum + (pt.value?.[i] || 0), 0) / timeline.length)
+        : 0;
+      return { keyword: kw, score: avg };
+    });
+    scores.sort((a, b) => b.score - a.score);
+
+    // Fetch related queries for the top keyword
+    let relatedQueries = [];
+    try {
+      const rqRaw = await googleTrends.relatedQueries({ keyword: keywords[0], geo: 'US' });
+      const rqData = JSON.parse(rqRaw);
+      relatedQueries = (rqData.default?.rankedList?.[0]?.rankedKeyword || [])
+        .slice(0, 8)
+        .map(r => ({ query: r.query, value: r.value }));
+    } catch (_) {}
+
+    res.json({
+      source: 'Google Trends (unofficial API)',
+      note: 'Meta Ad Library requires Facebook API credentials — not included',
+      geo: 'US',
+      period: 'last 90 days',
+      keywords: scores,
+      related_queries: relatedQueries,
+      copy_angles: buildCopyAngles(scores),
+    });
+  } catch (err) {
+    // Google Trends API can return 429 or fail — handle gracefully
+    const isRateLimit = err.message?.includes('429') || err.message?.includes('rate');
+    res.status(isRateLimit ? 429 : 502).json({
+      error: isRateLimit
+        ? 'Google Trends rate limited — try again in a few minutes'
+        : 'Google Trends fetch failed',
+      details: err.message,
+      fallback_angles: buildCopyAngles(keywords.map(kw => ({ keyword: kw, score: 0 }))),
+    });
+  }
+});
+
+function buildCopyAngles(scores) {
+  const angleMap = {
+    'belly fat':         ['Target belly fat specifically', 'Show before/after stomach results'],
+    'hormonal belly':    ['Address hormonal weight gain angle', 'Perimenopause/menopause messaging'],
+    'menopause weight':  ['Over-40 women audience', 'Hormonal weight loss copy'],
+    'weight loss':       ['General weight loss benefit', 'Numbers: lbs lost in weeks'],
+    'weighted hoop':     ['Product-specific USP', 'Fun vs. exercise framing'],
+    'hula hoop':         ['Nostalgia + modern twist', 'Low impact, high results'],
+  };
+
+  return scores.slice(0, 3).map(({ keyword, score }) => ({
+    keyword,
+    score,
+    angles: angleMap[keyword.toLowerCase()] || [`Test "${keyword}" copy angle`],
+  }));
+}
+
 // ── Start server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`IH Compositor v1.0.0 running on port ${PORT}`);
+  console.log(`IH Compositor v2.0.0 running on port ${PORT}`);
 });
 
 module.exports = app;
