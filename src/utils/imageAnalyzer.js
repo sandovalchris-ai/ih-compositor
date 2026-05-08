@@ -130,7 +130,7 @@ async function analyzeWinner(imageBuffer) {
   const isHighContrast = avgSat > 60;
 
   const estimated_layout = selectTemplate(
-    { isDark, leftRightContrast, topBottomContrast, leftDarker: left < right },
+    { overall, isDark, isHighContrast, leftRightContrast, topBottomContrast, leftDarker: left < right },
     {}
   );
 
