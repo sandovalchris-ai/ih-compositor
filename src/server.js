@@ -221,14 +221,15 @@ app.get('/trends', async (req, res) => {
       copy_angles: buildCopyAngles(scores),
     });
   } catch (err) {
-    // Google Trends API can return 429 or fail — handle gracefully
-    const isRateLimit = err.message?.includes('429') || err.message?.includes('rate');
-    res.status(isRateLimit ? 429 : 502).json({
-      error: isRateLimit
-        ? 'Google Trends rate limited — try again in a few minutes'
-        : 'Google Trends fetch failed',
-      details: err.message,
-      fallback_angles: buildCopyAngles(keywords.map(kw => ({ keyword: kw, score: 0 }))),
+    // Google Trends unofficial API is blocked on server IPs without consent cookie.
+    // Return 200 with copy angles — still useful for creative direction.
+    res.json({
+      source: 'copy-angle-fallback',
+      note: 'Google Trends blocked server-side requests. Copy angles are curated heuristics. Meta Ad Library requires Facebook API credentials.',
+      geo: 'US',
+      keywords: keywords.map(kw => ({ keyword: kw, score: null })),
+      related_queries: [],
+      copy_angles: buildCopyAngles(keywords.map(kw => ({ keyword: kw, score: 0 }))),
     });
   }
 });
