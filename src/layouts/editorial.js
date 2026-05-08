@@ -1,5 +1,11 @@
 /**
- * editorial layout — light pink/white background, long copy, emoji headline (IH11 reference)
+ * editorial — light pink/white, long copy, products split center (IH11 reference)
+ *
+ * Product zones (middle band y=235–530):
+ *   Left slot  (x=56,  w=450, h=295): bundle photo OR belt+tea+cream stacked
+ *   Right slot (x=562, w=450, h=295): hoop
+ *
+ * If only one product type is supplied it centers in the full width band.
  */
 const sharp = require('sharp');
 const { resizeContain } = require('../utils/imageLoader');
@@ -9,96 +15,82 @@ const W = 1080;
 const H = 1080;
 const PAD = 56;
 
-async function render(params) {
-  const { products, text, colors } = params;
+const PROD_TOP  = 235;
+const PROD_H    = 295;
+const SLOT_W    = 450;
+const LEFT_X    = 56;
+const RIGHT_X   = 562;  // LEFT_X + SLOT_W + 12 gap
+const BODY_Y    = PROD_TOP + PROD_H + 28;
 
+async function render({ products, text, colors }) {
   const bgColor = colors.background || '#FFF0F3';
 
-  // ── 1. Background ────────────────────────────────────────────────────────
+  // ── 1. Background ─────────────────────────────────────────────────────────
   const base = await sharp({
     create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
   }).png().toBuffer();
 
-  // ── 2. Products split: bundle left, hoop right ───────────────────────────
-  const halfW = Math.floor(W / 2) - PAD;
-  const productH = 300;
+  // ── 2. Load products in parallel ──────────────────────────────────────────
+  const giftW = 136; const giftH = 180;
+  const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
+    products.hoop   ? resizeContain(products.hoop,   SLOT_W, PROD_H) : null,
+    products.bundle ? resizeContain(products.bundle,  SLOT_W, PROD_H) : null,
+    products.belt   ? resizeContain(products.belt,   giftW,  giftH)  : null,
+    products.tea    ? resizeContain(products.tea,    giftW,  giftH)  : null,
+    products.cream  ? resizeContain(products.cream,  giftW,  giftH)  : null,
+  ]);
 
-  let bundleBuf = null;
-  let hoopBuf = null;
-
-  const bundleSource = products.bundle || products.belt || products.tea || null;
-  const hoopSource = products.hoop || null;
-
-  if (bundleSource) {
-    bundleBuf = await resizeContain(bundleSource, halfW, productH);
-  }
-  if (hoopSource) {
-    hoopBuf = await resizeContain(hoopSource, halfW, productH);
-  } else if (!bundleSource && products.cream) {
-    // fall back
-    bundleBuf = await resizeContain(products.cream, halfW, productH);
-  }
-
-  // ── 3. Text layer ────────────────────────────────────────────────────────
+  // ── 3. Text layer ─────────────────────────────────────────────────────────
   const textBuf = renderTextLayer(W, H, (ctx) => {
     ctx.textAlign = 'center';
 
-    // Emoji + headline
-    let headlineStr = text.headline || '';
-    let headlineY = 90;
-
-    if (headlineStr) {
-      let fontSize = 52;
-      while (fontSize > 20) {
-        ctx.font = `900 ${fontSize}px Impact`;
-        const lines = wrapText(ctx, headlineStr.toUpperCase(), W - PAD * 2);
-        if (lines.length <= 3) break;
-        fontSize -= 4;
-      }
+    // Headline — large, centered
+    const upper = (text.headline || '').toUpperCase();
+    let fontSize = 54;
+    while (fontSize > 20) {
       ctx.font = `900 ${fontSize}px Impact`;
-      const lines = wrapText(ctx, headlineStr.toUpperCase(), W - PAD * 2);
-      const lineH = fontSize * 1.2;
-
-      ctx.fillStyle = colors.headline || '#111111';
-      lines.forEach((line, i) => {
-        ctx.fillText(line, W / 2, headlineY + i * lineH);
-      });
-      headlineY += lines.length * lineH + 16;
+      if (wrapText(ctx, upper, W - PAD * 2).length <= 3) break;
+      fontSize -= 4;
     }
+    ctx.font = `900 ${fontSize}px Impact`;
+    const hlLines = wrapText(ctx, upper, W - PAD * 2);
+    const hlLineH = fontSize * 1.2;
+    ctx.fillStyle = colors.headline || '#111111';
+    hlLines.forEach((line, i) => ctx.fillText(line, W / 2, 80 + i * hlLineH));
 
     // Subheadline
     if (text.subheadline) {
       ctx.font = 'bold 26px Arial';
       ctx.fillStyle = '#444444';
-      ctx.fillText(text.subheadline, W / 2, headlineY + 10);
+      ctx.fillText(text.subheadline, W / 2, 80 + hlLines.length * hlLineH + 12);
     }
 
-    // Long body copy below products
-    if (text.body) {
-      const bodyStartY = 520;
-      const maxLineW = W - PAD * 2;
-      const paragraphs = text.body.split('\n').filter(Boolean);
+    // Divider line above product zone
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(PAD, PROD_TOP - 14);
+    ctx.lineTo(W - PAD, PROD_TOP - 14);
+    ctx.stroke();
 
-      ctx.font = '22px Arial';
+    // Body copy below product zone
+    if (text.body) {
+      const paragraphs = text.body.split('\n').filter(Boolean);
+      ctx.font = '21px Arial';
       ctx.fillStyle = '#333333';
       ctx.textAlign = 'left';
-      let curY = bodyStartY;
-
-      paragraphs.slice(0, 4).forEach((para) => {
-        const lines = wrapText(ctx, para, maxLineW);
-        lines.forEach((line) => {
-          if (curY < H - 100) {
-            ctx.fillText(line, PAD, curY);
-            curY += 30;
-          }
+      let curY = BODY_Y;
+      paragraphs.slice(0, 5).forEach((para) => {
+        wrapText(ctx, para, W - PAD * 2).forEach((line) => {
+          if (curY < H - 90) { ctx.fillText(line, PAD, curY); curY += 30; }
         });
-        curY += 8;
+        curY += 6;
       });
     }
 
-    // Bold CTA text at bottom (no button)
+    // CTA — bold colored text at bottom, no button
     if (text.cta) {
-      ctx.font = 'bold 32px Arial';
+      ctx.font = 'bold 34px Arial';
       ctx.fillStyle = colors.badge_bg || '#FF2D55';
       ctx.textAlign = 'center';
       ctx.fillText(text.cta.toUpperCase(), W / 2, H - PAD);
@@ -106,17 +98,43 @@ async function render(params) {
   });
 
   // ── 4. Composite ─────────────────────────────────────────────────────────
-  const productY = 230;
   const composites = [];
+  const hasLeft  = bundleBuf || beltBuf || teaBuf || creamBuf;
+  const hasRight = !!hoopBuf;
 
-  if (bundleBuf) {
-    composites.push({ input: bundleBuf, top: productY, left: PAD });
-  }
-  if (hoopBuf) {
-    composites.push({ input: hoopBuf, top: productY, left: Math.floor(W / 2) });
-  } else if (bundleBuf && !hoopBuf) {
-    // Center single product
-    composites[0] = { input: bundleBuf, top: productY, left: Math.floor((W - halfW) / 2) };
+  if (hasLeft && hasRight) {
+    // Both slots occupied
+    if (bundleBuf) {
+      composites.push({ input: bundleBuf, top: PROD_TOP, left: LEFT_X });
+    } else {
+      // Individual items stacked in left slot
+      const items = [beltBuf, teaBuf, creamBuf].filter(Boolean);
+      const gap   = 10;
+      const totalW = items.length * giftW + (items.length - 1) * gap;
+      let lx = LEFT_X + Math.round((SLOT_W - totalW) / 2);
+      items.forEach((buf) => {
+        composites.push({ input: buf, top: PROD_TOP + Math.round((PROD_H - giftH) / 2), left: lx });
+        lx += giftW + gap;
+      });
+    }
+    composites.push({ input: hoopBuf, top: PROD_TOP, left: RIGHT_X });
+  } else if (hasRight && !hasLeft) {
+    // Only hoop — center it
+    composites.push({ input: hoopBuf, top: PROD_TOP, left: Math.round((W - SLOT_W) / 2) });
+  } else if (hasLeft && !hasRight) {
+    // Only bundle/items — center them
+    if (bundleBuf) {
+      composites.push({ input: bundleBuf, top: PROD_TOP, left: Math.round((W - SLOT_W) / 2) });
+    } else {
+      const items = [beltBuf, teaBuf, creamBuf].filter(Boolean);
+      const gap   = 20;
+      const totalW = items.length * giftW + (items.length - 1) * gap;
+      let lx = Math.round((W - totalW) / 2);
+      items.forEach((buf) => {
+        composites.push({ input: buf, top: PROD_TOP + Math.round((PROD_H - giftH) / 2), left: lx });
+        lx += giftW + gap;
+      });
+    }
   }
 
   composites.push({ input: textBuf, top: 0, left: 0 });

@@ -1,151 +1,158 @@
 /**
- * ih-bundle layout — white background birthday/sale style (IH8 reference)
- * Structure top→bottom:
- *   Logo (small, centered)
- *   Social proof pill
- *   Badge pill
- *   Headline (large, bold, centered)
- *   Product image (centered)
- *   CTA pill (full-width, colored)
+ * ih-bundle — white/light background sale style (IH8 reference)
+ *
+ * Product zones (all use resizeContain — aspect ratio never altered):
+ *   Hoop hero:   600 × 400, centered horizontally, top=355
+ *   Bundle photo: 520 × 150, centered horizontally, top=762
+ *   — OR —
+ *   Individual belt/tea/cream: each 230 × 148, side by side, top=762
  */
 const sharp = require('sharp');
-const { resizeContain, resizeCover } = require('../utils/imageLoader');
+const { resizeContain } = require('../utils/imageLoader');
 const { renderTextLayer, drawRoundedRect, wrapText } = require('../utils/textRenderer');
 
 const W = 1080;
 const H = 1080;
 const PAD = 48;
 
-async function render(params) {
-  const { products, text, colors } = params;
+// Fixed product zone Y positions
+const HOOP_TOP  = 355;
+const HOOP_W    = 600;
+const HOOP_H    = 400;
+const GIFTS_TOP = 762;
+const GIFT_H    = 148;
 
+async function render({ products, text, colors }) {
   const bgColor = colors.background || '#FFFFFF';
 
-  // ── 1. Base canvas (flat color background) ──────────────────────────────
+  // ── 1. Background ─────────────────────────────────────────────────────────
   const base = await sharp({
     create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
   }).png().toBuffer();
 
-  // ── 2. Product image (hoop + bundle or just hoop) ────────────────────────
-  const productSource = products.hoop || products.bundle || null;
-  let productBuf = null;
-  if (productSource) {
-    productBuf = await resizeContain(productSource, 620, 420);
-  }
+  // ── 2. Load product images in parallel ────────────────────────────────────
+  const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
+    products.hoop   ? resizeContain(products.hoop,  HOOP_W, HOOP_H) : null,
+    products.bundle ? resizeContain(products.bundle, 520, GIFT_H)   : null,
+    products.belt   ? resizeContain(products.belt,   230, GIFT_H)   : null,
+    products.tea    ? resizeContain(products.tea,    230, GIFT_H)   : null,
+    products.cream  ? resizeContain(products.cream,  230, GIFT_H)   : null,
+  ]);
 
-  // ── 3. Text overlay layer ────────────────────────────────────────────────
+  // ── 3. Text layer ─────────────────────────────────────────────────────────
   const textBuf = renderTextLayer(W, H, (ctx) => {
-    // ── Logo area ──────────────────────────────────────────────────────────
+    // Logo
     ctx.fillStyle = '#111111';
     ctx.font = 'bold 22px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('INFINITY HOOP', W / 2, 58);
+    ctx.fillText('INFINITY HOOP', W / 2, 52);
 
-    // ── Social proof pill ──────────────────────────────────────────────────
+    // Social proof pill
     const spText = '★★★★★  Loved by 500,000+ Women';
     ctx.font = 'bold 18px Arial';
     const spW = ctx.measureText(spText).width + 40;
-    const spX = (W - spW) / 2;
-    const spY = 74;
     ctx.fillStyle = '#111111';
-    drawRoundedRect(ctx, spX, spY, spW, 38, 19);
+    drawRoundedRect(ctx, (W - spW) / 2, 66, spW, 36, 18);
     ctx.fill();
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    ctx.fillText(spText, W / 2, spY + 24);
+    ctx.fillText(spText, W / 2, 90);
 
-    // ── Badge pill ────────────────────────────────────────────────────────
+    // Badge pill
     if (text.badge) {
       ctx.font = 'bold 22px Arial';
       const bW = ctx.measureText(text.badge).width + 48;
-      const bX = (W - bW) / 2;
-      const bY = 124;
+      const bY = 114;
       ctx.fillStyle = colors.badge_bg || '#FF2D55';
-      drawRoundedRect(ctx, bX, bY, bW, 44, 22);
+      drawRoundedRect(ctx, (W - bW) / 2, bY, bW, 44, 22);
       ctx.fill();
       ctx.fillStyle = colors.badge_text || '#FFFFFF';
       ctx.textAlign = 'center';
       ctx.fillText(text.badge, W / 2, bY + 28);
     }
 
-    // ── Headline ──────────────────────────────────────────────────────────
+    // Headline — auto-sizes from 76px down, max 3 lines
     if (text.headline) {
-      const hlY = 190;
-      const maxHlW = W - PAD * 2;
-      let fontSize = 72;
-      const headlineUpper = text.headline.toUpperCase();
-
-      ctx.font = `900 ${fontSize}px Impact`;
-      // Auto-size down to fit
+      let fontSize = 76;
+      const upper = text.headline.toUpperCase();
       while (fontSize > 28) {
         ctx.font = `900 ${fontSize}px Impact`;
-        const lines = wrapText(ctx, headlineUpper, maxHlW);
-        if (lines.length <= 3) break;
+        if (wrapText(ctx, upper, W - PAD * 2).length <= 3) break;
         fontSize -= 4;
       }
       ctx.font = `900 ${fontSize}px Impact`;
-      const hlLines = wrapText(ctx, headlineUpper, maxHlW);
-      const lineH = fontSize * 1.15;
-
+      const lines = wrapText(ctx, upper, W - PAD * 2);
       ctx.fillStyle = colors.headline || '#111111';
       ctx.textAlign = 'center';
-      hlLines.forEach((line, i) => {
-        ctx.fillText(line, W / 2, hlY + i * lineH);
-      });
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, 182 + i * fontSize * 1.15));
     }
 
-    // ── Subheadline ───────────────────────────────────────────────────────
+    // Subheadline
     if (text.subheadline) {
-      const subY = text.headline ? 360 : 220;
-      ctx.font = 'bold 28px Arial';
+      ctx.font = 'bold 26px Arial';
       ctx.fillStyle = '#555555';
       ctx.textAlign = 'center';
-      ctx.fillText(text.subheadline, W / 2, subY);
+      ctx.fillText(text.subheadline, W / 2, 340);
     }
 
-    // ── CTA pill ──────────────────────────────────────────────────────────
+    // "FREE GIFTS INCLUDED" label above the gift row (only when gifts are shown)
+    const hasGifts = bundleBuf || beltBuf || teaBuf || creamBuf;
+    if (hasGifts) {
+      ctx.font = 'bold 17px Arial';
+      ctx.fillStyle = '#888888';
+      ctx.textAlign = 'center';
+      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 12);
+    }
+
+    // Urgency line (sits between gifts and CTA)
+    if (text.urgency) {
+      ctx.font = '17px Arial';
+      ctx.fillStyle = '#888888';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.urgency, W / 2, H - PAD - 72 - 22);
+    }
+
+    // CTA pill — full width, fixed at bottom
     if (text.cta) {
       const ctaH = 72;
       const ctaY = H - ctaH - PAD;
-      const ctaX = PAD;
-      const ctaW = W - PAD * 2;
       ctx.fillStyle = colors.cta_bg || '#FF2D55';
-      drawRoundedRect(ctx, ctaX, ctaY, ctaW, ctaH, 36);
+      drawRoundedRect(ctx, PAD, ctaY, W - PAD * 2, ctaH, 36);
       ctx.fill();
-
       ctx.font = 'bold 30px Arial';
       ctx.fillStyle = colors.cta_text || '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(text.cta.toUpperCase(), W / 2, ctaY + 44);
-    }
-
-    // ── Urgency text ──────────────────────────────────────────────────────
-    if (text.urgency) {
-      const urgY = H - PAD - 72 - 24;
-      ctx.font = '18px Arial';
-      ctx.fillStyle = '#888888';
-      ctx.textAlign = 'center';
-      ctx.fillText(text.urgency, W / 2, urgY);
+      ctx.fillText(text.cta.toUpperCase(), W / 2, ctaY + 46);
     }
   });
 
-  // ── 4. Composite everything ──────────────────────────────────────────────
+  // ── 4. Composite: bg → hoop → gifts → text ───────────────────────────────
   const composites = [];
 
-  if (productBuf) {
-    composites.push({
-      input: productBuf,
-      top: Math.round(H / 2 - 10),
-      left: Math.round((W - 620) / 2),
+  // Hoop centered
+  if (hoopBuf) {
+    composites.push({ input: hoopBuf, top: HOOP_TOP, left: Math.round((W - HOOP_W) / 2) });
+  }
+
+  // Bundle photo OR individual items side-by-side
+  if (bundleBuf) {
+    composites.push({ input: bundleBuf, top: GIFTS_TOP, left: Math.round((W - 520) / 2) });
+  } else {
+    // Lay out whichever individual items were supplied
+    const items = [beltBuf, teaBuf, creamBuf].filter(Boolean);
+    const itemW = 230;
+    const gap   = 20;
+    const totalW = items.length * itemW + (items.length - 1) * gap;
+    let leftX = Math.round((W - totalW) / 2);
+    items.forEach((buf) => {
+      composites.push({ input: buf, top: GIFTS_TOP, left: leftX });
+      leftX += itemW + gap;
     });
   }
 
   composites.push({ input: textBuf, top: 0, left: 0 });
 
-  return sharp(base)
-    .composite(composites)
-    .png()
-    .toBuffer();
+  return sharp(base).composite(composites).png().toBuffer();
 }
 
 function hexToObj(hex) {
