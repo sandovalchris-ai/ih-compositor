@@ -123,7 +123,7 @@ async function render({ products, text, colors, assets, background }) {
     if (text.headline) {
       const upper = text.headline.toUpperCase();
       const maxW  = W - PAD * 2;
-      const px    = fitFontSize(ctx, F.headline, upper, maxW, 88, 28, 3);
+      const px    = fitFontSize(ctx, F.headline, upper, maxW, 88, 20, 2);
       const lineH = px * 1.08;
       const lines = wrapText(ctx, upper, maxW);
       const hlY   = stripY + 44 + px * 0.82;

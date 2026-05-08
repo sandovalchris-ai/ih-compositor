@@ -92,14 +92,6 @@ async function render({ products, text, colors }) {
       drawGroundShadow(ctx, W / 2, HOOP_TOP + HOOP_H - 8, HOOP_W * 0.75, { opacity: 0.12 });
     }
 
-    // ── Urgency ──
-    if (text.urgency) {
-      ctx.font      = F.body(17);
-      ctx.fillStyle = '#888888';
-      ctx.textAlign = 'center';
-      ctx.fillText(text.urgency, W / 2, H - PAD - CTA_H - 28);
-    }
-
     // ── CTA pill ──
     if (text.cta) {
       drawCTA(ctx, text.cta, H - PAD - CTA_H, W, PAD, {
@@ -108,6 +100,14 @@ async function render({ products, text, colors }) {
         height:   CTA_H,
         fontSize: 34,
       });
+    }
+
+    // ── Urgency — sits below CTA, never touches products ──
+    if (text.urgency) {
+      ctx.font      = F.body(15);
+      ctx.fillStyle = '#999999';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.urgency, W / 2, H - 14);
     }
   });
 
