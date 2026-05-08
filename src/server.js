@@ -73,6 +73,56 @@ app.get('/debug-fonts', (req, res) => {
   }
 });
 
+// ── GET /debug-render ─────────────────────────────────────────────────────────
+app.get('/debug-render', async (req, res) => {
+  try {
+    const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
+    const sharp = require('sharp');
+
+    // Create a simple canvas with colored background and text
+    const canvas = createCanvas(400, 200);
+    const ctx = canvas.getContext('2d');
+
+    // White background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, 400, 200);
+
+    // Red box
+    ctx.fillStyle = '#FF0000';
+    ctx.fillRect(10, 10, 380, 50);
+
+    // Try text with IHBold
+    ctx.font = '700 36px IHBold';
+    const mW = ctx.measureText('HELLO').width;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('HELLO', 20, 48);
+
+    // Black line of text below
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 30px IHImpact';
+    ctx.fillText('IMPACT TEXT', 20, 110);
+
+    ctx.font = '400 24px IHRegular';
+    ctx.fillText('regular text', 20, 150);
+
+    // sans-serif fallback
+    ctx.font = '24px sans-serif';
+    ctx.fillText('sans-serif', 20, 185);
+
+    const pngBuf = canvas.toBuffer('image/png');
+
+    // Also composite via Sharp to test that path
+    const base = await sharp({ create: { width: 400, height: 200, channels: 4, background: { r:200, g:200, b:200, alpha:1 } } }).png().toBuffer();
+    const result = await sharp(base).composite([{ input: pngBuf, top: 0, left: 0 }]).png().toBuffer();
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('X-MeasureText-IHBold', mW);
+    res.send(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /layouts ─────────────────────────────────────────────────────────────
 app.get('/layouts', (req, res) => {
   res.json({ layouts: getLayouts() });
