@@ -20,9 +20,9 @@ const W = 1080, H = 1080, PAD = 48;
 //   Gifts:        y=763–911
 //   Urgency:      y=916
 //   CTA:          y=928–1000
-const BADGE_BOTTOM = 130;
-const HL_Y_START   = 155;   // headline first-line baseline; cap-top ≈ 155-60 = 95 > BADGE_BOTTOM ✓
-const HOOP_TOP = 415, HOOP_W = 600, HOOP_H = 340;
+const BADGE_BOTTOM = 158;   // badge pill bottom (bY=114 + h=44)
+const HL_Y_START   = 250;   // headline first-line baseline; cap-top ≈ 250-58 = 192 > BADGE_BOTTOM ✓
+const HOOP_TOP = 420, HOOP_W = 600, HOOP_H = 330;
 const GIFTS_TOP = 763, GIFT_H = 148;
 
 async function render({ products, text, colors }) {
@@ -51,7 +51,7 @@ async function render({ products, text, colors }) {
     ctx.fillText('INFINITY HOOP', W / 2, 52);
 
     // Social proof pill
-    const spText = '★★★★★  Loved by 500,000+ Women';
+    const spText = '5-STAR  Loved by 500,000+ Women';
     ctx.font = F.badge(17);
     const spW = ctx.measureText(spText).width + 40;
     ctx.fillStyle = '#111111';

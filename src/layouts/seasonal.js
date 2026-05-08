@@ -107,7 +107,7 @@ async function render({ products, text, colors, background }) {
     ctx.font      = F.body(15);
     ctx.fillStyle = '#666666';
     ctx.textAlign = 'center';
-    ctx.fillText('★★★★★  500,000+ Women Love Infinity Hoop', W / 2, H - 22);
+    ctx.fillText('5-STAR  500,000+ Women Love Infinity Hoop', W / 2, H - 22);
   });
 
   // ── 4. Composite ──────────────────────────────────────────────────────────
