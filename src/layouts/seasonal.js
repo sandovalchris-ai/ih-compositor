@@ -77,11 +77,19 @@ async function render({ products, text, colors, background }) {
         ctx.fillStyle = dotColor;
         ctx.fill();
 
-        // Checkmark
-        ctx.font      = F.badge(20);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.fillText('✓', rightX + 18, by + 7);
+        // Checkmark drawn as a canvas path (avoids font subset gaps)
+        const cx = rightX + 18;
+        ctx.save();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth   = 3.5;
+        ctx.lineCap     = 'round';
+        ctx.lineJoin    = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 7, by + 1);
+        ctx.lineTo(cx - 1, by + 7);
+        ctx.lineTo(cx + 8, by - 6);
+        ctx.stroke();
+        ctx.restore();
 
         // Benefit text
         ctx.font      = F.badge(21);
