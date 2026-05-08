@@ -76,47 +76,44 @@ app.get('/debug-fonts', (req, res) => {
 // ── GET /debug-render ─────────────────────────────────────────────────────────
 app.get('/debug-render', async (req, res) => {
   try {
-    const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
+    const { createCanvas } = require('@napi-rs/canvas');
     const sharp = require('sharp');
 
-    // Create a simple canvas with colored background and text
-    const canvas = createCanvas(400, 200);
-    const ctx = canvas.getContext('2d');
+    // TEST A: opaque canvas (debug sanity)
+    const canvasA = createCanvas(400, 100);
+    const ctxA = canvasA.getContext('2d');
+    ctxA.fillStyle = '#FFFFFF'; ctxA.fillRect(0, 0, 400, 100);
+    ctxA.fillStyle = '#FF0000'; ctxA.fillRect(5, 5, 390, 40);
+    ctxA.font = '700 30px IHBold'; ctxA.fillStyle = '#FFFFFF';
+    ctxA.fillText('OPAQUE CANVAS', 10, 35);
+    ctxA.fillStyle = '#000000'; ctxA.font = '700 26px IHImpact';
+    ctxA.fillText('IMPACT BELOW', 10, 80);
+    const bufA = canvasA.toBuffer('image/png');
 
-    // White background
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 400, 200);
+    // TEST B: TRANSPARENT canvas (exactly like renderTextLayer) composited via Sharp
+    const canvasB = createCanvas(400, 100);
+    const ctxB = canvasB.getContext('2d');
+    // NO background fill — transparent canvas
+    ctxB.fillStyle = '#FF0000'; ctxB.fillRect(5, 5, 390, 40);
+    ctxB.font = '700 30px IHBold'; ctxB.fillStyle = '#FFFFFF';
+    ctxB.fillText('TRANSPARENT CANVAS', 10, 35);
+    ctxB.fillStyle = '#000000'; ctxB.font = '700 26px IHImpact';
+    ctxB.fillText('TEXT ON TRANSPARENT', 10, 80);
+    const bufB = canvasB.toBuffer('image/png');
 
-    // Red box
-    ctx.fillStyle = '#FF0000';
-    ctx.fillRect(10, 10, 380, 50);
+    // Composite B onto a gray Sharp base (the real-world path)
+    const baseB = await sharp({ create: { width: 400, height: 100, channels: 4, background: { r:220, g:220, b:220, alpha:1 } } }).png().toBuffer();
+    const compositeB = await sharp(baseB).composite([{ input: bufB, top: 0, left: 0 }]).png().toBuffer();
 
-    // Try text with IHBold
-    ctx.font = '700 36px IHBold';
-    const mW = ctx.measureText('HELLO').width;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('HELLO', 20, 48);
-
-    // Black line of text below
-    ctx.fillStyle = '#000000';
-    ctx.font = '700 30px IHImpact';
-    ctx.fillText('IMPACT TEXT', 20, 110);
-
-    ctx.font = '400 24px IHRegular';
-    ctx.fillText('regular text', 20, 150);
-
-    // sans-serif fallback
-    ctx.font = '24px sans-serif';
-    ctx.fillText('sans-serif', 20, 185);
-
-    const pngBuf = canvas.toBuffer('image/png');
-
-    // Also composite via Sharp to test that path
-    const base = await sharp({ create: { width: 400, height: 200, channels: 4, background: { r:200, g:200, b:200, alpha:1 } } }).png().toBuffer();
-    const result = await sharp(base).composite([{ input: pngBuf, top: 0, left: 0 }]).png().toBuffer();
+    // Stack A and compositeB into one tall image for comparison
+    const combined = await sharp({ create: { width: 400, height: 210, channels: 4, background: { r:255, g:255, b:255, alpha:1 } } })
+      .png().toBuffer();
+    const result = await sharp(combined).composite([
+      { input: bufA, top: 0, left: 0 },
+      { input: compositeB, top: 110, left: 0 },
+    ]).png().toBuffer();
 
     res.setHeader('Content-Type', 'image/png');
-    res.setHeader('X-MeasureText-IHBold', mW);
     res.send(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
