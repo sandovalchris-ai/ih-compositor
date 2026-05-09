@@ -9,6 +9,10 @@ const { F, renderTextLayer, drawRoundedRect, drawLogo, wrapText, fitFontSize } =
 
 const W = 1080, H = 1350, PAD = 55;
 
+function stripEmoji(str) {
+  return (str || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
+}
+
 async function render({ products, text, colors }) {
   // BG — pure white
   const bgBuf = await sharp({
@@ -59,7 +63,7 @@ async function render({ products, text, colors }) {
 
     // Giant headline — auto-fit
     if (text.headline) {
-      const upper = text.headline.toUpperCase();
+      const upper = stripEmoji(text.headline).toUpperCase();
       const px = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 112, 48, 3);
       const lineH = px * 1.05;
       const lines = wrapText(ctx, upper, W - PAD * 2);
@@ -74,7 +78,7 @@ async function render({ products, text, colors }) {
       ctx.font = F.headline(112);
       ctx.fillStyle = colors.badge_bg || '#00AEEF';
       ctx.textAlign = 'center';
-      ctx.fillText(text.subheadline.toUpperCase(), W / 2, 375);
+      ctx.fillText(stripEmoji(text.subheadline).toUpperCase(), W / 2, 375);
       // Party emoji
       ctx.font = '90px serif';
       ctx.fillText('🎉', 830, 375);
@@ -88,7 +92,7 @@ async function render({ products, text, colors }) {
       ctx.font = F.badge(32);
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(text.badge.toUpperCase(), W / 2, 453);
+      ctx.fillText(stripEmoji(text.badge).toUpperCase(), W / 2, 453);
     }
 
     // Arrow labels pointing to products
@@ -124,7 +128,7 @@ async function render({ products, text, colors }) {
       ctx.font = F.badge(40);
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(text.cta.toUpperCase(), W / 2, 1298);
+      ctx.fillText(stripEmoji(text.cta).toUpperCase(), W / 2, 1298);
     }
   });
 

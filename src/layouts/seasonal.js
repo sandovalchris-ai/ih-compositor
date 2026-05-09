@@ -10,6 +10,10 @@ const { F, renderTextLayer, drawRoundedRect, wrapText, fitFontSize } = require('
 
 const W = 1080, H = 1350, PAD = 55;
 
+function stripEmoji(str) {
+  return (str || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
+}
+
 async function render({ products, text, colors }) {
   const bannerColor = colors.badge_bg || '#CC1111';
 
@@ -76,11 +80,11 @@ async function render({ products, text, colors }) {
     ctx.font = F.badge(40);
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    ctx.fillText((text.badge || 'LIMITED TIME SALE').toUpperCase(), W / 2, 58);
+    ctx.fillText(stripEmoji(text.badge || 'LIMITED TIME SALE').toUpperCase(), W / 2, 58);
 
     // Big headline — 2 lines max
     if (text.headline) {
-      const upper = text.headline.toUpperCase();
+      const upper = stripEmoji(text.headline).toUpperCase();
       const px = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 106, 56, 2);
       const lineH = px * 1.05;
       const lines = wrapText(ctx, upper, W - PAD * 2);
@@ -95,7 +99,7 @@ async function render({ products, text, colors }) {
       ctx.font = F.badge(26);
       ctx.fillStyle = '#666666';
       ctx.textAlign = 'center';
-      ctx.fillText(text.subheadline.toUpperCase(), W / 2, 340);
+      ctx.fillText(stripEmoji(text.subheadline).toUpperCase(), W / 2, 340);
     }
 
     // Benefit circle icons — line art drawn with canvas paths
@@ -182,7 +186,7 @@ async function render({ products, text, colors }) {
       ctx.font = F.badge(46);
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(text.cta.toUpperCase(), W / 2, 1313);
+      ctx.fillText(stripEmoji(text.cta).toUpperCase(), W / 2, 1313);
     }
   });
 

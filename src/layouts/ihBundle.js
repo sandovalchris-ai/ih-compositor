@@ -12,9 +12,13 @@ const {
 } = require('../utils/textRenderer');
 
 const W = 1080, H = 1080, PAD = 48;
-const HOOP_TOP = 420, HOOP_W = 620, HOOP_H = 330;
-const GIFTS_TOP = 770, GIFT_H = 148;
+const HOOP_TOP = 380, HOOP_W = 820, HOOP_H = 500;
+const GIFTS_TOP = 900, GIFT_H = 200;
 const CTA_H = 80;
+
+function stripEmoji(str) {
+  return (str || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
+}
 
 async function render({ products, text, colors }) {
   const bgColor = colors.background || '#FFFFFF';
@@ -41,7 +45,7 @@ async function render({ products, text, colors }) {
     // ── Badge pill ──
     let badgeBottom = spBottom;
     if (text.badge) {
-      badgeBottom = drawPill(ctx, text.badge, W / 2, spBottom + 10, {
+      badgeBottom = drawPill(ctx, stripEmoji(text.badge), W / 2, spBottom + 10, {
         font:   F.badge(22),
         bg:     colors.badge_bg || '#FF2D55',
         color:  colors.badge_text || '#FFFFFF',
@@ -52,7 +56,7 @@ async function render({ products, text, colors }) {
 
     // ── Headline (Bebas Neue) ──
     if (text.headline) {
-      const upper  = text.headline.toUpperCase();
+      const upper  = stripEmoji(text.headline).toUpperCase();
       const maxW   = W - PAD * 2;
       const px     = fitFontSize(ctx, F.headline, upper, maxW, 112, 36, 3);
       const lineH  = px * 1.08;
@@ -74,7 +78,7 @@ async function render({ products, text, colors }) {
         ctx.font      = F.badge(24);
         ctx.fillStyle = '#555555';
         ctx.textAlign = 'center';
-        ctx.fillText(text.subheadline, W / 2, hlY + lines.length * lineH + 16);
+        ctx.fillText(stripEmoji(text.subheadline), W / 2, hlY + lines.length * lineH + 16);
       }
     }
 
@@ -94,7 +98,7 @@ async function render({ products, text, colors }) {
 
     // ── CTA pill ──
     if (text.cta) {
-      drawCTA(ctx, text.cta, H - PAD - CTA_H, W, PAD, {
+      drawCTA(ctx, stripEmoji(text.cta), H - PAD - CTA_H, W, PAD, {
         bg:       colors.cta_bg || '#FF2D55',
         color:    colors.cta_text || '#FFFFFF',
         height:   CTA_H,
@@ -107,7 +111,7 @@ async function render({ products, text, colors }) {
       ctx.font      = F.body(15);
       ctx.fillStyle = '#999999';
       ctx.textAlign = 'center';
-      ctx.fillText(text.urgency, W / 2, H - 14);
+      ctx.fillText(stripEmoji(text.urgency), W / 2, H - 14);
     }
   });
 
