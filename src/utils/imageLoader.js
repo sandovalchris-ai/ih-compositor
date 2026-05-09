@@ -59,4 +59,29 @@ async function getImageDimensions(source) {
   return { width: meta.width, height: meta.height };
 }
 
-module.exports = { loadImageBuffer, resizeContain, resizeCover, getImageDimensions };
+async function removeBackground(imageBuffer) {
+  const apiKey = process.env.REMOVEBG_API_KEY;
+  if (!apiKey) return imageBuffer;
+  try {
+    const FormData = require('form-data');
+    const fetch = require('node-fetch');
+    const form = new FormData();
+    form.append('image_file', imageBuffer, { filename: 'product.png' });
+    form.append('size', 'auto');
+    const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: { 'X-Api-Key': apiKey, ...form.getHeaders() },
+      body: form,
+    });
+    if (!response.ok) {
+      console.warn('Remove.bg failed:', response.status);
+      return imageBuffer;
+    }
+    return await response.buffer();
+  } catch (e) {
+    console.warn('Remove.bg error:', e.message);
+    return imageBuffer;
+  }
+}
+
+module.exports = { loadImageBuffer, resizeContain, resizeCover, getImageDimensions, removeBackground };
