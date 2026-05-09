@@ -1,127 +1,141 @@
 /**
- * editorial — light pink/white, long copy, products split center
+ * editorial — IH13 style
+ * White bg · Stars social proof · Giant black headline ·
+ * Black offer pill · Hoop large left · Bundle right with arrow labels · CTA pill
  */
 const sharp = require('sharp');
-const { resizeContain } = require('../utils/imageLoader');
-const { F, renderTextLayer, drawRoundedRect, wrapText, fitFontSize } = require('../utils/textRenderer');
+const { loadImageBuffer, resizeContain, removeBackground } = require('../utils/imageLoader');
+const { F, renderTextLayer, drawRoundedRect, drawLogo, wrapText, fitFontSize } = require('../utils/textRenderer');
 
-const W = 1080, H = 1080, PAD = 56;
-const PROD_TOP = 220, PROD_H = 310, SLOT_W = 460;
-const LEFT_X = 56, RIGHT_X = 556;
-const BODY_Y  = PROD_TOP + PROD_H + 32;
-const GIFT_W  = 136, GIFT_H  = 180;
+const W = 1080, H = 1350, PAD = 55;
 
 async function render({ products, text, colors }) {
-  const bgColor = colors.background || '#FFF0F3';
-
-  const base = await sharp({
-    create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
+  // BG — pure white
+  const bgBuf = await sharp({
+    create: { width: W, height: H, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
   }).png().toBuffer();
 
-  const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
-    products.hoop   ? resizeContain(products.hoop,   SLOT_W, PROD_H) : null,
-    products.bundle ? resizeContain(products.bundle,  SLOT_W, PROD_H) : null,
-    products.belt   ? resizeContain(products.belt,   GIFT_W, GIFT_H) : null,
-    products.tea    ? resizeContain(products.tea,    GIFT_W, GIFT_H) : null,
-    products.cream  ? resizeContain(products.cream,  GIFT_W, GIFT_H) : null,
+  async function loadClean(src, w, h) {
+    if (!src) return null;
+    const buf   = await loadImageBuffer(src);
+    const clean = await removeBackground(buf);
+    return sharp(clean)
+      .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+  }
+
+  const [hoopBuf, beltBuf, creamBuf, detoxBuf] = await Promise.all([
+    loadClean(products.hoop,  580, 580),
+    loadClean(products.belt,  230, 230),
+    loadClean(products.cream, 175, 175),
+    loadClean(products.tea,   215, 215),
   ]);
 
-  const textBuf = renderTextLayer(W, H, (ctx) => {
-    ctx.textAlign = 'center';
+  const hoopM  = hoopBuf  ? await sharp(hoopBuf).metadata()  : null;
+  const beltM  = beltBuf  ? await sharp(beltBuf).metadata()  : null;
+  const creamM = creamBuf ? await sharp(creamBuf).metadata() : null;
+  const detoxM = detoxBuf ? await sharp(detoxBuf).metadata() : null;
 
-    // ── Headline (Bebas Neue) ──
+  // Product positions — hoop large left, bundle stacked right
+  const hoopLeft  = 20;
+  const hoopTop   = 490;
+  const beltLeft  = hoopM ? 700 : 0;
+  const beltTop   = 500;
+  const detoxLeft = hoopM ? 730 : 0;
+  const detoxTop  = 730;
+  const creamLeft = hoopM ? 420 : 0;
+  const creamTop  = 920;
+
+  const textBuf = renderTextLayer(W, H, (ctx) => {
+    // Stars + social proof
+    ctx.font = F.body(22);
+    ctx.fillStyle = '#00B67A';
+    ctx.textAlign = 'center';
+    ctx.fillText('★★★★★', 310, 42);
+    ctx.fillStyle = '#333333';
+    ctx.textAlign = 'left';
+    ctx.fillText('Loved by OVER 500,000+ Happy Women', 360, 42);
+
+    // Giant headline — auto-fit
     if (text.headline) {
       const upper = text.headline.toUpperCase();
-      const px    = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 96, 24, 2);
-      ctx.font      = F.headline(px);
+      const px = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 112, 48, 3);
+      const lineH = px * 1.05;
+      const lines = wrapText(ctx, upper, W - PAD * 2);
+      ctx.font = F.headline(px);
       ctx.fillStyle = colors.headline || '#111111';
-      wrapText(ctx, upper, W - PAD * 2).forEach((line, i) =>
-        ctx.fillText(line, W / 2, 88 + i * px * 1.08));
-    }
-
-    // ── Subheadline ──
-    if (text.subheadline) {
-      ctx.font      = F.badge(24);
-      ctx.fillStyle = '#444444';
-      ctx.fillText(text.subheadline, W / 2, 196);
-    }
-
-    // ── Divider ──
-    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-    ctx.lineWidth   = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(PAD, PROD_TOP - 12);
-    ctx.lineTo(W - PAD, PROD_TOP - 12);
-    ctx.stroke();
-
-    // ── Body copy ──
-    if (text.body) {
-      const paragraphs = text.body.split('\n').filter(Boolean);
-      ctx.font      = F.body(21);
-      ctx.fillStyle = '#333333';
-      ctx.textAlign = 'left';
-      let curY = BODY_Y;
-      paragraphs.slice(0, 6).forEach((para) => {
-        wrapText(ctx, para, W - PAD * 2).forEach((line) => {
-          if (curY < H - 100) { ctx.fillText(line, PAD, curY); curY += 30; }
-        });
-        curY += 8;
-      });
-    }
-
-    // ── CTA — bold colored text at bottom ──
-    if (text.cta) {
-      ctx.font      = F.cta(38);
-      ctx.fillStyle = colors.badge_bg || '#FF2D55';
       ctx.textAlign = 'center';
-      ctx.fillText(text.cta.toUpperCase(), W / 2, H - PAD);
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, 130 + i * lineH));
+    }
+
+    // Accent line 2 color
+    if (text.subheadline) {
+      ctx.font = F.headline(112);
+      ctx.fillStyle = colors.badge_bg || '#00AEEF';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.subheadline.toUpperCase(), W / 2, 375);
+      // Party emoji
+      ctx.font = '90px serif';
+      ctx.fillText('🎉', 830, 375);
+    }
+
+    // Black offer pill
+    if (text.badge) {
+      ctx.fillStyle = '#111111';
+      drawRoundedRect(ctx, 80, 405, 920, 76, 38);
+      ctx.fill();
+      ctx.font = F.badge(32);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.badge.toUpperCase(), W / 2, 453);
+    }
+
+    // Arrow labels pointing to products
+    const accentColor = colors.badge_bg || '#E91E8C';
+    const labelConfigs = [
+      { text: 'FREE SLIMMING BELT', x: 600, y: 508, tx: 740, ty: 590 },
+      { text: 'FREE DETOX TEA',     x: 640, y: 755, tx: 760, ty: 730 },
+      { text: 'FREE TONING CREAM',  x: 60,  y: 880, tx: 200, ty: 940 },
+    ];
+
+    labelConfigs.forEach(({ text: lt, x, y, tx, ty }) => {
+      ctx.fillStyle = accentColor;
+      drawRoundedRect(ctx, x, y, lt.length * 13 + 40, 42, 21);
+      ctx.fill();
+      ctx.font = F.badge(18);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(lt, x + (lt.length * 13 + 40) / 2, y + 27);
+      // Arrow line
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 20);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    });
+
+    // CTA pill
+    if (text.cta) {
+      ctx.fillStyle = colors.cta_bg || accentColor;
+      drawRoundedRect(ctx, 55, 1240, 970, 90, 45);
+      ctx.fill();
+      ctx.font = F.badge(40);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.cta.toUpperCase(), W / 2, 1298);
     }
   });
 
   const composites = [];
-  const hasLeft  = bundleBuf || beltBuf || teaBuf || creamBuf;
-  const hasRight = !!hoopBuf;
-
-  if (hasLeft && hasRight) {
-    if (bundleBuf) {
-      composites.push({ input: bundleBuf, top: PROD_TOP, left: LEFT_X });
-    } else {
-      const items  = [beltBuf, teaBuf, creamBuf].filter(Boolean);
-      const gap    = 10;
-      const totalW = items.length * GIFT_W + (items.length - 1) * gap;
-      let lx       = LEFT_X + Math.round((SLOT_W - totalW) / 2);
-      items.forEach((buf) => {
-        composites.push({ input: buf, top: PROD_TOP + Math.round((PROD_H - GIFT_H) / 2), left: lx });
-        lx += GIFT_W + gap;
-      });
-    }
-    composites.push({ input: hoopBuf, top: PROD_TOP, left: RIGHT_X });
-  } else if (hasRight) {
-    composites.push({ input: hoopBuf, top: PROD_TOP, left: Math.round((W - SLOT_W) / 2) });
-  } else if (hasLeft) {
-    if (bundleBuf) {
-      composites.push({ input: bundleBuf, top: PROD_TOP, left: Math.round((W - SLOT_W) / 2) });
-    } else {
-      const items  = [beltBuf, teaBuf, creamBuf].filter(Boolean);
-      const gap    = 20;
-      const totalW = items.length * GIFT_W + (items.length - 1) * gap;
-      let lx       = Math.round((W - totalW) / 2);
-      items.forEach((buf) => {
-        composites.push({ input: buf, top: PROD_TOP + Math.round((PROD_H - GIFT_H) / 2), left: lx });
-        lx += GIFT_W + gap;
-      });
-    }
-  }
-
+  if (hoopBuf)  composites.push({ input: hoopBuf,  top: hoopTop,  left: hoopLeft  });
+  if (beltBuf)  composites.push({ input: beltBuf,  top: beltTop,  left: beltLeft  });
+  if (detoxBuf) composites.push({ input: detoxBuf, top: detoxTop, left: detoxLeft });
+  if (creamBuf) composites.push({ input: creamBuf, top: creamTop, left: creamLeft });
   composites.push({ input: textBuf, top: 0, left: 0 });
 
-  return sharp(base).composite(composites).png().toBuffer();
-}
-
-function hexToObj(hex) {
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-  return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16), alpha: 1 };
+  return sharp(bgBuf).composite(composites).png().toBuffer();
 }
 
 module.exports = { render };
