@@ -1,129 +1,199 @@
 /**
- * seasonal — gradient/scene background, hoop left, text+checkmarks+CTA right
- * Supports: assets.lifestyle or assets.model as background
+ * seasonal — IH17 style
+ * White bg · Red top+bottom banners · Big quote headline ·
+ * Hoop center with 4 benefit circles + line-art icons + arrows ·
+ * Bundle row bottom · Red CTA banner
  */
 const sharp = require('sharp');
-const { resizeContain, resizeCover } = require('../utils/imageLoader');
-const { F, renderTextLayer, drawRoundedRect, drawCTA, wrapText, fitFontSize } = require('../utils/textRenderer');
+const { loadImageBuffer, resizeContain, removeBackground } = require('../utils/imageLoader');
+const { F, renderTextLayer, drawRoundedRect, wrapText, fitFontSize } = require('../utils/textRenderer');
 
-const W = 1080, H = 1080, PAD = 52;
-const BANNER_H = 88;
-const HOOP_LEFT = 10, HOOP_TOP = BANNER_H + 20, HOOP_W = 510, HOOP_H = H - HOOP_TOP - 60;
+const W = 1080, H = 1350, PAD = 55;
 
-async function render({ products, text, colors, background, assets }) {
-  let base;
-  const bgSrc = (assets && (assets.lifestyle || assets.model)) ? (assets.lifestyle || assets.model) : background;
+async function render({ products, text, colors }) {
+  const bannerColor = colors.badge_bg || '#CC1111';
 
-  if (bgSrc) {
-    const raw = await resizeCover(bgSrc, W, H);
-    const wash = await sharp({
-      create: { width: W, height: H, channels: 4, background: { r:255, g:255, b:255, alpha: 0.32 } },
-    }).png().toBuffer();
-    base = await sharp(raw).composite([{ input: wash, top: 0, left: 0 }]).png().toBuffer();
-  } else {
-    const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#FFE4EC"/>
-        <stop offset="100%" stop-color="#FFF9FB"/>
-      </linearGradient></defs>
-      <rect width="${W}" height="${H}" fill="url(#g)"/>
-    </svg>`;
-    base = await sharp(Buffer.from(svg)).png().toBuffer();
+  // BG with gray zone and benefit circles pre-drawn
+  const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <rect width="${W}" height="${H}" fill="#FFFFFF"/>
+    <defs>
+      <linearGradient id="gz" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#FFFFFF"/>
+        <stop offset="15%" stop-color="#F2F2F2"/>
+        <stop offset="85%" stop-color="#F2F2F2"/>
+        <stop offset="100%" stop-color="#FFFFFF"/>
+      </linearGradient>
+    </defs>
+    <rect x="0" y="450" width="${W}" height="660" fill="url(#gz)"/>
+    <rect x="0" y="0" width="${W}" height="90" fill="${bannerColor}"/>
+    <rect x="0" y="1255" width="${W}" height="95" fill="${bannerColor}"/>
+    <circle cx="148" cy="670" r="100" fill="#E0E0E0"/>
+    <circle cx="148" cy="670" r="96"  fill="#FFFFFF"/>
+    <circle cx="932" cy="670" r="100" fill="#E0E0E0"/>
+    <circle cx="932" cy="670" r="96"  fill="#FFFFFF"/>
+    <circle cx="148" cy="930" r="100" fill="#E0E0E0"/>
+    <circle cx="148" cy="930" r="96"  fill="#FFFFFF"/>
+    <circle cx="932" cy="930" r="100" fill="#E0E0E0"/>
+    <circle cx="932" cy="930" r="96"  fill="#FFFFFF"/>
+  </svg>`;
+  const bgBuf = await sharp(Buffer.from(bgSvg)).png().toBuffer();
+
+  async function loadClean(src, w, h) {
+    if (!src) return null;
+    const buf   = await loadImageBuffer(src);
+    const clean = await removeBackground(buf);
+    return sharp(clean)
+      .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
   }
 
-  const hoopBuf = products.hoop ? await resizeContain(products.hoop, HOOP_W, HOOP_H) : null;
+  const [hoopBuf, beltBuf, creamBuf, detoxBuf] = await Promise.all([
+    loadClean(products.hoop,  500, 500),
+    loadClean(products.belt,  210, 210),
+    loadClean(products.cream, 180, 180),
+    loadClean(products.tea,   200, 200),
+  ]);
 
-  const rightX = HOOP_LEFT + HOOP_W + 16;
-  const rightW = W - rightX - PAD;
+  const hoopM  = hoopBuf  ? await sharp(hoopBuf).metadata()  : null;
+  const beltM  = beltBuf  ? await sharp(beltBuf).metadata()  : null;
+  const creamM = creamBuf ? await sharp(creamBuf).metadata() : null;
+  const detoxM = detoxBuf ? await sharp(detoxBuf).metadata() : null;
+
+  const hoopLeft  = hoopM  ? Math.round(540 - hoopM.width  / 2) : 0;
+  const hoopTop   = hoopM  ? Math.round(800 - hoopM.height / 2) : 0;
+  const rowY      = 1068;
+  const creamLeft = creamM ? Math.round(175  - creamM.width / 2) : 0;
+  const beltLeft  = beltM  ? Math.round(540  - beltM.width  / 2) : 0;
+  const detoxLeft = detoxM ? Math.round(905  - detoxM.width / 2) : 0;
+
+  const benefits = text.body
+    ? text.body.split('\n').filter(Boolean).slice(0, 4)
+    : ['Kills Stubborn\nBelly Fat', 'Shrinks\nMan Boobs', 'Boosts T\n& Energy', 'Easy on\nBad Knees'];
 
   const textBuf = renderTextLayer(W, H, (ctx) => {
-    // ── Top banner / badge ──
-    if (text.badge) {
-      ctx.font      = F.badge(26);
-      ctx.fillStyle = colors.badge_bg || '#FF2D55';
-      drawRoundedRect(ctx, 24, 16, W - 48, BANNER_H - 16, 24);
-      ctx.fill();
-      ctx.fillStyle = colors.badge_text || '#FFFFFF';
+    // Top banner text
+    ctx.font = F.badge(40);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText((text.badge || 'LIMITED TIME SALE').toUpperCase(), W / 2, 58);
+
+    // Big headline — 2 lines max
+    if (text.headline) {
+      const upper = text.headline.toUpperCase();
+      const px = fitFontSize(ctx, F.headline, upper, W - PAD * 2, 106, 56, 2);
+      const lineH = px * 1.05;
+      const lines = wrapText(ctx, upper, W - PAD * 2);
+      ctx.font = F.headline(px);
+      ctx.fillStyle = colors.headline || '#111111';
       ctx.textAlign = 'center';
-      ctx.fillText(text.badge, W / 2, 16 + (BANNER_H - 16) / 2 + 9);
+      lines.slice(0, 2).forEach((line, i) => ctx.fillText(line, W / 2, 168 + i * lineH));
     }
 
-    // ── Headline (Bebas Neue, right column) ──
-    if (text.headline) {
-      const upper    = text.headline.toUpperCase();
-      const px       = fitFontSize(ctx, F.headline, upper, rightW, 96, 28, 4);
-      const lineH    = px * 1.08;
-      const hlStartY = BANNER_H + 40;
-      const lines    = wrapText(ctx, upper, rightW);
+    // Subhead
+    if (text.subheadline) {
+      ctx.font = F.badge(26);
+      ctx.fillStyle = '#666666';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.subheadline.toUpperCase(), W / 2, 340);
+    }
 
-      ctx.font      = F.headline(px);
-      ctx.fillStyle = colors.headline || '#111111';
-      ctx.textAlign = 'left';
-      lines.forEach((line, i) => ctx.fillText(line, rightX, hlStartY + i * lineH));
+    // Benefit circle icons — line art drawn with canvas paths
+    const circleData = [
+      { cx: 148, cy: 670, label: benefits[0] || '' },
+      { cx: 932, cy: 670, label: benefits[1] || '' },
+      { cx: 148, cy: 930, label: benefits[2] || '' },
+      { cx: 932, cy: 930, label: benefits[3] || '' },
+    ];
 
-      // ── Checkmark benefits ──
-      const benefits = text.body
-        ? text.body.split('\n').filter(Boolean).slice(0, 3)
-        : ['Free Shipping Today', 'Results in 2 Weeks', '30-Day Money Back'];
+    function drawWaistIcon(ctx, cx, cy) {
+      ctx.strokeStyle = bannerColor; ctx.lineWidth = 3.5; ctx.fillStyle = 'none';
+      ctx.beginPath(); ctx.ellipse(cx, cy - 8, 22, 28, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = bannerColor; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.rect(cx - 40, cy - 14, 80, 14); ctx.stroke();
+      [cx - 20, cx, cx + 20].forEach(x => {
+        ctx.beginPath(); ctx.moveTo(x, cy - 14); ctx.lineTo(x, cy - 7); ctx.stroke();
+      });
+    }
+    function drawTorsoIcon(ctx, cx, cy) {
+      ctx.strokeStyle = bannerColor; ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 30); ctx.bezierCurveTo(cx - 28, cy - 30, cx - 38, cy - 15, cx - 38, cy + 5);
+      ctx.lineTo(cx - 38, cy + 25); ctx.lineTo(cx + 38, cy + 25); ctx.lineTo(cx + 38, cy + 5);
+      ctx.bezierCurveTo(cx + 38, cy - 15, cx + 28, cy - 30, cx, cy - 30);
+      ctx.stroke();
+      ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - 28, cy - 10); ctx.lineTo(cx + 28, cy - 10); ctx.stroke();
+    }
+    function drawBoltIcon(ctx, cx, cy) {
+      ctx.strokeStyle = bannerColor; ctx.lineWidth = 3.5; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx + 10, cy - 28); ctx.lineTo(cx - 14, cy + 4);
+      ctx.lineTo(cx + 2,  cy + 4);  ctx.lineTo(cx - 10, cy + 28);
+      ctx.lineTo(cx + 14, cy - 4);  ctx.lineTo(cx - 2,  cy - 4);
+      ctx.closePath(); ctx.stroke();
+    }
+    function drawKneeIcon(ctx, cx, cy) {
+      ctx.strokeStyle = bannerColor; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(cx - 11, cy - 32, 22, 28, 8); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy + 4, 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(cx - 11, cy + 18, 22, 28, 8); ctx.stroke();
+    }
 
-      const benefitY = hlStartY + lines.length * lineH + 28;
-      const dotColor = colors.badge_bg || '#FF2D55';
+    const iconFns = [drawWaistIcon, drawTorsoIcon, drawBoltIcon, drawKneeIcon];
 
-      benefits.forEach((benefit, i) => {
-        const by = benefitY + i * 62;
+    circleData.forEach(({ cx, cy, label }, i) => {
+      ctx.save();
+      iconFns[i](ctx, cx, cy - 14);
+      ctx.restore();
 
-        // Circle
-        ctx.beginPath();
-        ctx.arc(rightX + 18, by, 20, 0, Math.PI * 2);
-        ctx.fillStyle = dotColor;
-        ctx.fill();
-
-        // Checkmark (drawn as path — no font needed)
-        const cx = rightX + 18;
-        ctx.save();
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth   = 3.5;
-        ctx.lineCap     = 'round';
-        ctx.lineJoin    = 'round';
-        ctx.beginPath();
-        ctx.moveTo(cx - 7, by + 1);
-        ctx.lineTo(cx - 1, by + 7);
-        ctx.lineTo(cx + 9, by - 7);
-        ctx.stroke();
-        ctx.restore();
-
-        // Benefit text
-        ctx.font      = F.badge(21);
-        ctx.fillStyle = '#222222';
-        ctx.textAlign = 'left';
-        ctx.fillText(benefit, rightX + 48, by + 7);
+      label.split('\n').forEach((line, j) => {
+        ctx.font = F.badge(18);
+        ctx.fillStyle = '#111111';
+        ctx.textAlign = 'center';
+        ctx.fillText(line, cx, cy + 52 + j * 22);
       });
 
-      // ── CTA ──
-      if (text.cta) {
-        const ctaY = H - 156;
-        ctx.fillStyle = colors.cta_bg || '#FF2D55';
-        drawRoundedRect(ctx, rightX, ctaY, rightW, 72, 36);
-        ctx.fill();
-        ctx.font      = F.cta(26);
-        ctx.fillStyle = colors.cta_text || '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.fillText(text.cta.toUpperCase(), rightX + rightW / 2, ctaY + 46);
-      }
-    }
+      // Arrow toward hoop center (540, 800)
+      const angle  = Math.atan2(800 - cy, 540 - cx);
+      const startX = cx + Math.cos(angle) * 104;
+      const startY = cy + Math.sin(angle) * 104;
+      const endX   = cx + Math.cos(angle) * 140;
+      const endY   = cy + Math.sin(angle) * 140;
+      ctx.strokeStyle = bannerColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      // Arrowhead
+      const headLen   = 10;
+      const headAngle = Math.PI / 6;
+      ctx.beginPath();
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - headLen * Math.cos(angle - headAngle), endY - headLen * Math.sin(angle - headAngle));
+      ctx.lineTo(endX - headLen * Math.cos(angle + headAngle), endY - headLen * Math.sin(angle + headAngle));
+      ctx.closePath();
+      ctx.fillStyle = bannerColor;
+      ctx.fill();
+    });
 
-    // ── Social proof footer ──
-    ctx.font      = F.body(15);
-    ctx.fillStyle = '#666666';
-    ctx.textAlign = 'center';
-    ctx.fillText('5-STAR  500,000+ Women Love Infinity Hoop', W / 2, H - 22);
+    // Bottom banner text
+    if (text.cta) {
+      ctx.font = F.badge(46);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(text.cta.toUpperCase(), W / 2, 1313);
+    }
   });
 
   const composites = [];
-  if (hoopBuf) composites.push({ input: hoopBuf, top: HOOP_TOP, left: HOOP_LEFT });
+  if (hoopBuf)  composites.push({ input: hoopBuf,  top: hoopTop, left: hoopLeft  });
+  if (creamBuf) composites.push({ input: creamBuf, top: rowY,    left: creamLeft });
+  if (beltBuf)  composites.push({ input: beltBuf,  top: rowY,    left: beltLeft  });
+  if (detoxBuf) composites.push({ input: detoxBuf, top: rowY,    left: detoxLeft });
   composites.push({ input: textBuf, top: 0, left: 0 });
 
-  return sharp(base).composite(composites).png().toBuffer();
+  return sharp(bgBuf).composite(composites).png().toBuffer();
 }
 
 module.exports = { render };
