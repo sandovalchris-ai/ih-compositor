@@ -1,145 +1,178 @@
 /**
- * ih-bundle — white/light background sale style
- * Logo · Social proof (drawn stars) · Badge pill · Headline (Bebas Neue)
- * Hoop hero centered · Free gifts row · CTA pill · Urgency
+ * ih-bundle — IH9 style
+ * 960×1220 · badge banner · offer pill · hoop card · 3 gift cards · CTA pill
  */
 const sharp = require('sharp');
-const { resizeContain } = require('../utils/imageLoader');
-const {
-  F, renderTextLayer, drawRoundedRect, drawPill, drawCTA,
-  drawSocialProof, drawLogo, drawGroundShadow,
-  wrapText, fitFontSize,
-} = require('../utils/textRenderer');
+const { loadImageBuffer, removeBackground } = require('../utils/imageLoader');
+const { F, renderTextLayer, drawRoundedRect } = require('../utils/textRenderer');
 
-const W = 1080, H = 1080, PAD = 48;
-const HOOP_TOP = 380, HOOP_W = 820, HOOP_H = 500;
-const GIFTS_TOP = 900, GIFT_H = 200;
-const CTA_H = 80;
+const W = 960, H = 1220;
+
+// Hoop card
+const CARD_X = 70, CARD_Y = 215, CARD_W = 820, CARD_H = 560;
+
+// Gift card row
+const GIFT_Y = 826, GIFT_CARD_H = 330, GIFT_W = 276;
+const IMG_MAX = 200;          // max product image size inside gift card
+const IMG_Y   = GIFT_Y + 54; // top of product image zone (below FREE pill)
+
+const GIFTS = [
+  { x: 28,  cx: 166, key: 'belt',  label: 'FREE SLIMMING BELT' },
+  { x: 342, cx: 480, key: 'cream', label: 'FREE TONING CREAM'  },
+  { x: 656, cx: 794, key: 'tea',   label: 'FREE DETOX TEA'     },
+];
 
 function stripEmoji(str) {
   return (str || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
 }
 
 async function render({ products, text, colors }) {
+  const accent  = colors.badge_bg || colors.accent || colors.cta_bg || '#FF2D55';
   const bgColor = colors.background || '#FFFFFF';
 
-  const base = await sharp({
-    create: { width: W, height: H, channels: 4, background: hexToObj(bgColor) },
-  }).png().toBuffer();
+  async function loadClean(src, w, h) {
+    if (!src) return null;
+    const buf   = await loadImageBuffer(src);
+    const clean = await removeBackground(buf);
+    return sharp(clean)
+      .resize(w, h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+  }
 
-  const [hoopBuf, bundleBuf, beltBuf, teaBuf, creamBuf] = await Promise.all([
-    products.hoop   ? resizeContain(products.hoop,   HOOP_W, HOOP_H) : null,
-    products.bundle ? resizeContain(products.bundle,  520,    GIFT_H) : null,
-    products.belt   ? resizeContain(products.belt,    230,    GIFT_H) : null,
-    products.tea    ? resizeContain(products.tea,     230,    GIFT_H) : null,
-    products.cream  ? resizeContain(products.cream,   230,    GIFT_H) : null,
+  // Load all product images in parallel
+  const [hoopBuf, beltBuf, creamBuf, detoxBuf] = await Promise.all([
+    loadClean(products.hoop,  656, 448),
+    loadClean(products.belt,  IMG_MAX, IMG_MAX),
+    loadClean(products.cream, IMG_MAX, IMG_MAX),
+    loadClean(products.tea,   IMG_MAX, IMG_MAX),
   ]);
 
+  const hoopM  = hoopBuf  ? await sharp(hoopBuf).metadata()  : null;
+  const beltM  = beltBuf  ? await sharp(beltBuf).metadata()  : null;
+  const creamM = creamBuf ? await sharp(creamBuf).metadata() : null;
+  const detoxM = detoxBuf ? await sharp(detoxBuf).metadata() : null;
+
+  const giftMetas = { belt: beltM, cream: creamM, tea: detoxM };
+  const giftBufs  = { belt: beltBuf, cream: creamBuf, tea: detoxBuf };
+
+  // ── Base layer: background + white card shapes (SVG) ─────────────────────────
+  const baseSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <rect width="${W}" height="${H}" fill="${bgColor}"/>
+    <rect x="${CARD_X}" y="${CARD_Y}" width="${CARD_W}" height="${CARD_H}" rx="32" fill="white" stroke="#222222" stroke-width="3"/>
+    <rect x="28"  y="${GIFT_Y}" width="${GIFT_W}" height="${GIFT_CARD_H}" rx="24" fill="white" stroke="#DDDDDD" stroke-width="1.5"/>
+    <rect x="342" y="${GIFT_Y}" width="${GIFT_W}" height="${GIFT_CARD_H}" rx="24" fill="white" stroke="#DDDDDD" stroke-width="1.5"/>
+    <rect x="656" y="${GIFT_Y}" width="${GIFT_W}" height="${GIFT_CARD_H}" rx="24" fill="white" stroke="#DDDDDD" stroke-width="1.5"/>
+  </svg>`;
+  const baseBuf = await sharp(Buffer.from(baseSvg)).png().toBuffer();
+
+  // ── Text / UI layer (transparent canvas, composited last) ────────────────────
   const textBuf = renderTextLayer(W, H, (ctx) => {
-    // ── Logo ──
-    drawLogo(ctx, W, 38, { color: colors.headline || '#111111' });
+    // Logo
+    ctx.font      = F.body(16);
+    ctx.fillStyle = '#999999';
+    ctx.textAlign = 'center';
+    ctx.fillText('INFINITY HOOP', W / 2, 50);
 
-    // ── Social proof pill ──
-    const spBottom = drawSocialProof(ctx, W, 52);
-
-    // ── Badge pill ──
-    let badgeBottom = spBottom;
+    // Full-width badge banner
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 80, W, 82);
     if (text.badge) {
-      badgeBottom = drawPill(ctx, stripEmoji(text.badge), W / 2, spBottom + 10, {
-        font:   F.badge(22),
-        bg:     colors.badge_bg || '#FF2D55',
-        color:  colors.badge_text || '#FFFFFF',
-        padX:   36,
-        height: 52,
-      });
+      ctx.font      = F.badge(28);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(stripEmoji(text.badge).toUpperCase(), W / 2, 131);
     }
 
-    // ── Headline (Bebas Neue) ──
+    // Offer pill (black pill, white Bebas Neue text)
     if (text.headline) {
-      const upper  = stripEmoji(text.headline).toUpperCase();
-      const maxW   = W - PAD * 2;
-      const px     = fitFontSize(ctx, F.headline, upper, maxW, 112, 36, 3);
-      const lineH  = px * 1.08;
-      const lines  = wrapText(ctx, upper, maxW);
-      const hlY    = badgeBottom + 24 + px * 0.75;
-
-      ctx.save();
-      ctx.shadowColor   = 'rgba(0,0,0,0.1)';
-      ctx.shadowBlur    = 4;
-      ctx.shadowOffsetY = 2;
-      ctx.font      = F.headline(px);
-      ctx.fillStyle = colors.headline || '#111111';
+      const hl = stripEmoji(text.headline).toUpperCase();
+      ctx.fillStyle = '#111111';
+      drawRoundedRect(ctx, W / 2 - 240, 195, 480, 66, 33);
+      ctx.fill();
+      ctx.font      = F.headline(44);
+      ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      lines.forEach((line, i) => ctx.fillText(line, W / 2, hlY + i * lineH));
-      ctx.restore();
-
-      // ── Subheadline ──
-      if (text.subheadline) {
-        ctx.font      = F.badge(24);
-        ctx.fillStyle = '#555555';
-        ctx.textAlign = 'center';
-        ctx.fillText(stripEmoji(text.subheadline), W / 2, hlY + lines.length * lineH + 16);
-      }
+      ctx.fillText(hl, W / 2, 241);
     }
 
-    // ── "FREE GIFTS INCLUDED" label ──
-    const hasGifts = bundleBuf || beltBuf || teaBuf || creamBuf;
-    if (hasGifts) {
-      ctx.font      = F.body(15);
-      ctx.fillStyle = '#888888';
+    // Gift card UI: FREE pill + label + strikethrough price
+    GIFTS.forEach(({ cx, key, label }) => {
+      const buf = giftBufs[key];
+      if (!buf) return;
+
+      // FREE pill — overlaps top edge of gift card
+      const pillW = 110, pillH = 36;
+      ctx.fillStyle = accent;
+      drawRoundedRect(ctx, cx - pillW / 2, GIFT_Y - 18, pillW, pillH, 18);
+      ctx.fill();
+      ctx.font      = F.badge(17);
+      ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText('FREE GIFTS INCLUDED:', W / 2, GIFTS_TOP - 18);
-    }
+      ctx.fillText('FREE', cx, GIFT_Y + 14);
 
-    // ── Ground shadow for hoop ──
-    if (hoopBuf) {
-      drawGroundShadow(ctx, W / 2, HOOP_TOP + HOOP_H - 8, HOOP_W * 0.75, { opacity: 0.12 });
-    }
+      // Product label
+      const labelY = IMG_Y + IMG_MAX + 26;
+      ctx.font      = F.badge(13);
+      ctx.fillStyle = '#111111';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, cx, labelY);
 
-    // ── CTA pill ──
+      // Strikethrough price
+      const priceY = labelY + 24;
+      ctx.font      = F.body(13);
+      ctx.fillStyle = '#AAAAAA';
+      ctx.textAlign = 'center';
+      ctx.fillText('$29.99', cx, priceY);
+      const pw = ctx.measureText('$29.99').width;
+      ctx.strokeStyle = '#AAAAAA';
+      ctx.lineWidth   = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - pw / 2, priceY - 5);
+      ctx.lineTo(cx + pw / 2, priceY - 5);
+      ctx.stroke();
+    });
+
+    // CTA pill
     if (text.cta) {
-      drawCTA(ctx, stripEmoji(text.cta), H - PAD - CTA_H, W, PAD, {
-        bg:       colors.cta_bg || '#FF2D55',
-        color:    colors.cta_text || '#FFFFFF',
-        height:   CTA_H,
-        fontSize: 34,
-      });
-    }
-
-    // ── Urgency — sits below CTA, never touches products ──
-    if (text.urgency) {
-      ctx.font      = F.body(15);
-      ctx.fillStyle = '#999999';
+      ctx.fillStyle = accent;
+      drawRoundedRect(ctx, 28, 1162, W - 56, 58, 29);
+      ctx.fill();
+      ctx.font      = F.badge(26);
+      ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(stripEmoji(text.urgency), W / 2, H - 14);
+      ctx.fillText(stripEmoji(text.cta).toUpperCase(), W / 2, 1200);
     }
   });
 
+  // ── Composite ─────────────────────────────────────────────────────────────────
   const composites = [];
 
-  if (hoopBuf) composites.push({ input: hoopBuf, top: HOOP_TOP, left: Math.round((W - HOOP_W) / 2) });
-
-  if (bundleBuf) {
-    composites.push({ input: bundleBuf, top: GIFTS_TOP, left: Math.round((W - 520) / 2) });
-  } else {
-    const items = [beltBuf, teaBuf, creamBuf].filter(Boolean);
-    const itemW = 230, gap = 20;
-    let lx = Math.round((W - (items.length * itemW + (items.length - 1) * gap)) / 2);
-    items.forEach((buf) => {
-      composites.push({ input: buf, top: GIFTS_TOP, left: lx });
-      lx += itemW + gap;
+  // Hoop — centered inside hoop card
+  if (hoopBuf && hoopM) {
+    composites.push({
+      input: hoopBuf,
+      top:  Math.round(CARD_Y + (CARD_H - hoopM.height) / 2),
+      left: Math.round(CARD_X + (CARD_W - hoopM.width)  / 2),
     });
   }
 
+  // Gift product images — centered horizontally, top-aligned in image zone
+  GIFTS.forEach(({ cx, key }) => {
+    const buf  = giftBufs[key];
+    const meta = giftMetas[key];
+    if (!buf || !meta) return;
+    composites.push({
+      input: buf,
+      top:  Math.round(IMG_Y + (IMG_MAX - meta.height) / 2),
+      left: Math.round(cx - meta.width / 2),
+    });
+  });
+
+  // Text/UI layer last — sits on top of everything
   composites.push({ input: textBuf, top: 0, left: 0 });
 
-  return sharp(base).composite(composites).png().toBuffer();
-}
-
-function hexToObj(hex) {
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-  return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16), alpha: 1 };
+  return sharp(baseBuf).composite(composites).png().toBuffer();
 }
 
 module.exports = { render };
