@@ -18,7 +18,7 @@ app.use(express.json({ limit: '100mb' }));
 
 // ── GET /health ───────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '3.0.0' });
+  res.json({ status: 'ok', version: '3.1.0' });
 });
 
 // ── GET /layouts ──────────────────────────────────────────────────────────────
@@ -211,6 +211,92 @@ app.post('/composite-batch', async (req, res) => {
   }
 });
 
+// ── POST /build-ad ────────────────────────────────────────────────────────────
+// Accepts: { layout, text, colors, productUrls: { hoop, belt, cream, tea } }
+// Each productUrl value may be a public https:// URL or a base64 data URI.
+// Removes backgrounds via Remove.bg, renders layout, returns PNG.
+app.post('/build-ad', async (req, res) => {
+  try {
+    const {
+      layout      = 'ih-bundle',
+      text        = {},
+      colors      = {},
+      productUrls = {},
+    } = req.body || {};
+
+    const { loadImageBuffer, removeBackground } = require('./utils/imageLoader');
+
+    async function cleanProduct(src) {
+      if (!src) return null;
+      const buf   = await loadImageBuffer(src);
+      const clean = await removeBackground(buf);
+      return `data:image/png;base64,${clean.toString('base64')}`;
+    }
+
+    const [hoop, belt, cream, tea] = await Promise.all([
+      cleanProduct(productUrls.hoop),
+      cleanProduct(productUrls.belt),
+      cleanProduct(productUrls.cream),
+      cleanProduct(productUrls.tea),
+    ]);
+
+    const products = {};
+    if (hoop)  products.hoop  = hoop;
+    if (belt)  products.belt  = belt;
+    if (cream) products.cream = cream;
+    if (tea)   products.tea   = tea;
+
+    const normalizedColors = {
+      background: colors.background || colors.bg || '#FFFFFF',
+      headline:   colors.headline   || '#111111',
+      badge_bg:   colors.badge_bg   || colors.accent || '#FF2D55',
+      badge_text: colors.badge_text || '#FFFFFF',
+      cta_bg:     colors.cta_bg     || colors.accent || '#FF2D55',
+      cta_text:   colors.cta_text   || '#FFFFFF',
+      ...colors,
+    };
+
+    const pngBuffer = await composite({ layout, products, text, colors: normalizedColors });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="ad_${layout}.png"`);
+    res.send(pngBuffer);
+  } catch (err) {
+    console.error('Build-ad error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /test-ad ──────────────────────────────────────────────────────────────
+// Renders a test ih-bundle ad with no product images — smoke-test the pipeline.
+app.get('/test-ad', async (req, res) => {
+  try {
+    const pngBuffer = await composite({
+      layout:   'ih-bundle',
+      products: {},
+      text: {
+        badge:   'TEST SALE 70% OFF',
+        headline: 'MELT BELLY FAT IN 30 DAYS',
+        cta:     'SHOP NOW',
+        urgency: 'Only 47 units left',
+      },
+      colors: {
+        background: '#FFFFFF',
+        headline:   '#111111',
+        badge_bg:   '#FF2D55',
+        badge_text: '#FFFFFF',
+        cta_bg:     '#FF2D55',
+        cta_text:   '#FFFFFF',
+      },
+    });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', 'inline; filename="test-ad.png"');
+    res.send(pngBuffer);
+  } catch (err) {
+    console.error('Test-ad error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /trends ───────────────────────────────────────────────────────────────
 // ?keywords=belly+fat,hormonal+weight,menopause
 app.get('/trends', async (req, res) => {
@@ -378,7 +464,7 @@ function buildCopyAngles(scores) {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`IH Compositor v3.0.0 running on port ${PORT}`);
+  console.log(`IH Compositor v3.1.0 running on port ${PORT}`);
 });
 
 module.exports = app;
