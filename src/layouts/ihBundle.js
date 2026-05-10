@@ -9,12 +9,14 @@ const { F, renderTextLayer, drawRoundedRect } = require('../utils/textRenderer')
 const W = 960, H = 1220;
 
 // Hoop card
-const CARD_X = 70, CARD_Y = 215, CARD_W = 820, CARD_H = 560;
+const CARD_X = 70, CARD_Y = 215, CARD_W = 820, CARD_H = 540;
 
 // Gift card row
-const GIFT_Y = 826, GIFT_CARD_H = 330, GIFT_W = 276;
-const IMG_MAX = 200;          // max product image size inside gift card
-const IMG_Y   = GIFT_Y + 54; // top of product image zone (below FREE pill)
+const GIFT_Y      = 826;
+const GIFT_CARD_H = 310;
+const GIFT_W      = 276;
+const IMG_MAX     = 185;           // max product image height inside gift card
+const IMG_Y       = GIFT_Y + 52;  // image zone top (clears FREE pill)
 
 const GIFTS = [
   { x: 28,  cx: 166, key: 'belt',  label: 'FREE SLIMMING BELT' },
@@ -23,7 +25,8 @@ const GIFTS = [
 ];
 
 function stripEmoji(str) {
-  return (str || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
+  if (!str) return '';
+  return str.replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F000}-\u{1F02F}|\u{1F0A0}-\u{1F0FF}|\u{1F100}-\u{1F1FF}|\u{1F200}-\u{1F2FF}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FA6F}|\u{1FA70}-\u{1FAFF}]/gu, '').trim();
 }
 
 async function render({ products, text, colors }) {
@@ -40,9 +43,9 @@ async function render({ products, text, colors }) {
       .toBuffer();
   }
 
-  // Load all product images in parallel
+  // hoop: 656×480 ensures min 480px wide even for square images
   const [hoopBuf, beltBuf, creamBuf, detoxBuf] = await Promise.all([
-    loadClean(products.hoop,  656, 448),
+    loadClean(products.hoop,  656, 480),
     loadClean(products.belt,  IMG_MAX, IMG_MAX),
     loadClean(products.cream, IMG_MAX, IMG_MAX),
     loadClean(products.tea,   IMG_MAX, IMG_MAX),
@@ -84,7 +87,7 @@ async function render({ products, text, colors }) {
       ctx.fillText(stripEmoji(text.badge).toUpperCase(), W / 2, 131);
     }
 
-    // Offer pill (black pill, white Bebas Neue text)
+    // Offer pill — black pill, white Bebas Neue
     if (text.headline) {
       const hl = stripEmoji(text.headline).toUpperCase();
       ctx.fillStyle = '#111111';
@@ -96,7 +99,7 @@ async function render({ products, text, colors }) {
       ctx.fillText(hl, W / 2, 241);
     }
 
-    // Gift card UI: FREE pill + label + strikethrough price
+    // Gift card UI: FREE pill · label · strikethrough price
     GIFTS.forEach(({ cx, key, label }) => {
       const buf = giftBufs[key];
       if (!buf) return;
@@ -111,16 +114,16 @@ async function render({ products, text, colors }) {
       ctx.textAlign = 'center';
       ctx.fillText('FREE', cx, GIFT_Y + 14);
 
-      // Product label
-      const labelY = IMG_Y + IMG_MAX + 26;
-      ctx.font      = F.badge(13);
+      // Product label — bold 16px
+      const labelY = IMG_Y + IMG_MAX + 22;
+      ctx.font      = F.badge(16);
       ctx.fillStyle = '#111111';
       ctx.textAlign = 'center';
       ctx.fillText(label, cx, labelY);
 
-      // Strikethrough price
-      const priceY = labelY + 24;
-      ctx.font      = F.body(13);
+      // Strikethrough price — gray 14px
+      const priceY = labelY + 22;
+      ctx.font      = F.body(14);
       ctx.fillStyle = '#AAAAAA';
       ctx.textAlign = 'center';
       ctx.fillText('$29.99', cx, priceY);
@@ -133,15 +136,15 @@ async function render({ products, text, colors }) {
       ctx.stroke();
     });
 
-    // CTA pill
+    // CTA pill — y=1158, height=58, 40px padding each side
     if (text.cta) {
       ctx.fillStyle = accent;
-      drawRoundedRect(ctx, 28, 1162, W - 56, 58, 29);
+      drawRoundedRect(ctx, 40, 1158, W - 80, 58, 29);
       ctx.fill();
       ctx.font      = F.badge(26);
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(stripEmoji(text.cta).toUpperCase(), W / 2, 1200);
+      ctx.fillText(stripEmoji(text.cta).toUpperCase(), W / 2, 1196);
     }
   });
 
@@ -157,7 +160,7 @@ async function render({ products, text, colors }) {
     });
   }
 
-  // Gift product images — centered horizontally, top-aligned in image zone
+  // Gift product images — centered in image zone
   GIFTS.forEach(({ cx, key }) => {
     const buf  = giftBufs[key];
     const meta = giftMetas[key];
@@ -169,7 +172,7 @@ async function render({ products, text, colors }) {
     });
   });
 
-  // Text/UI layer last — sits on top of everything
+  // Text/UI layer last
   composites.push({ input: textBuf, top: 0, left: 0 });
 
   return sharp(baseBuf).composite(composites).png().toBuffer();
