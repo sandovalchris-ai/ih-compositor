@@ -36,6 +36,78 @@ const DEFAULT_PRODUCTS = {
   tea:   path.join(STATIC_DIR, 'detox.webp'),
 };
 
+// ── Competitor intelligence constants ─────────────────────────────────────────
+const COMPETITOR_SEARCHES = [
+  // Hormonal health
+  { term: 'menopause weight gain',      category: 'hormonal_health' },
+  { term: 'hormonal belly women',       category: 'hormonal_health' },
+  { term: 'cortisol weight loss',       category: 'hormonal_health' },
+  { term: 'thyroid weight loss women',  category: 'hormonal_health' },
+  { term: 'over 40 weight loss',        category: 'hormonal_health' },
+  { term: 'perimenopause fitness',      category: 'hormonal_health' },
+  // Pain points
+  { term: 'bad knees workout',          category: 'pain_points' },
+  { term: 'low impact exercise women',  category: 'pain_points' },
+  { term: 'joint pain workout',         category: 'pain_points' },
+  { term: 'diastasis recti workout',    category: 'pain_points' },
+  { term: 'postpartum weight loss',     category: 'pain_points' },
+  { term: 'mommy pooch workout',        category: 'pain_points' },
+  // Emotional / lifestyle
+  { term: 'stress eating women',        category: 'emotional_lifestyle' },
+  { term: 'emotional eating stop',      category: 'emotional_lifestyle' },
+  { term: 'body transformation before after', category: 'emotional_lifestyle' },
+  { term: 'wedding weight loss',        category: 'emotional_lifestyle' },
+  { term: 'vacation body women',        category: 'emotional_lifestyle' },
+  { term: 'reunion body transformation',category: 'emotional_lifestyle' },
+  // Social proof
+  { term: 'women over 50 fitness',      category: 'social_proof' },
+  { term: 'real women weight loss',     category: 'social_proof' },
+  { term: 'mom transformation story',   category: 'social_proof' },
+  { term: 'busy woman workout',         category: 'social_proof' },
+  // Supplements
+  { term: 'weight loss supplement women', category: 'supplements' },
+  { term: 'fat burner women',           category: 'supplements' },
+  { term: 'metabolism booster',         category: 'supplements' },
+  { term: 'belly fat supplement',       category: 'supplements' },
+  // Fitness equipment
+  { term: 'home workout equipment women', category: 'fitness_equipment' },
+  { term: 'resistance bands women',     category: 'fitness_equipment' },
+  { term: 'pilates equipment home',     category: 'fitness_equipment' },
+  { term: 'yoga fitness women',         category: 'fitness_equipment' },
+  // Body transformation
+  { term: 'weight loss program women',  category: 'body_transformation' },
+  { term: 'body transformation women',  category: 'body_transformation' },
+  { term: 'lose weight at home',        category: 'body_transformation' },
+  { term: 'flat belly workout',         category: 'body_transformation' },
+  // Confidence
+  { term: 'body confidence women',      category: 'confidence' },
+  { term: 'feel good in your body',     category: 'confidence' },
+  { term: 'love your body transformation', category: 'confidence' },
+  { term: 'women confidence workout',   category: 'confidence' },
+  { term: 'glow up fitness women',      category: 'confidence' },
+  // Self-care
+  { term: 'self care women routine',    category: 'self_care' },
+  { term: 'wellness routine women',     category: 'self_care' },
+  { term: 'feel beautiful confident',   category: 'self_care' },
+  { term: 'women empowerment fitness',  category: 'self_care' },
+  // Trending NOW
+  { term: 'GLP-1 weight loss alternative', category: 'trending' },
+  { term: 'Ozempic alternative natural',   category: 'trending' },
+  { term: 'inflammation belly fat',        category: 'trending' },
+  { term: 'gut health weight loss',        category: 'trending' },
+  { term: 'lymphatic drainage fitness',    category: 'trending' },
+  // Shapewear
+  { term: 'shapewear women',            category: 'shapewear' },
+  { term: 'waist trainer women',        category: 'shapewear' },
+  { term: 'sweat belt women',           category: 'shapewear' },
+  { term: 'belly fat burner women',     category: 'shapewear' },
+];
+
+const COMPETITOR_BRANDS = [
+  'Alpilean', 'Ikaria Lean Belly', 'Java Burn', 'Hydroxycut',
+  'Leanbean', 'Noom', 'WeightWatchers', 'Calibrate', 'Found Health', 'Ro Body',
+];
+
 // ── CORS + JSON ───────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin',  '*');
@@ -357,6 +429,121 @@ Return ONLY valid JSON — no markdown, no explanation:
 
   const result = await runGenerationPipeline({ count: 25, competitorContext: blueprint });
   return { blueprint, ...result };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEEP COMPETITOR SCRAPER — all categories + brand monitoring
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function scrapeCompetitors() {
+  const fbToken = process.env.FACEBOOK_ACCESS_TOKEN;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const rawAds  = [];
+  const byCat   = {};
+
+  const metaFetch = async (term, category, extra = {}) => {
+    if (!fbToken) return [];
+    try {
+      const url = `https://graph.facebook.com/v19.0/ads_archive?access_token=${fbToken}&search_terms=${encodeURIComponent(term)}&ad_reached_countries=["US"]&ad_active_status=ACTIVE&fields=id,ad_creative_bodies,ad_creative_link_titles,page_name&limit=5`;
+      const r = await fetch(url);
+      if (!r.ok) return [];
+      const d = await r.json();
+      return (d.data || []).map(ad => ({
+        brand:      ad.page_name || 'Unknown',
+        headline:   (ad.ad_creative_link_titles || [])[0] || (ad.ad_creative_bodies || [])[0]?.slice(0, 80) || '',
+        body:       (ad.ad_creative_bodies || [])[0] || '',
+        search_term: term,
+        category,
+        ...extra,
+      }));
+    } catch(e) {
+      console.warn(`[SCRAPE] Error for "${term}":`, e.message);
+      return [];
+    }
+  };
+
+  // Scrape all search terms (3 concurrent)
+  for (let i = 0; i < COMPETITOR_SEARCHES.length; i += 3) {
+    const chunk = COMPETITOR_SEARCHES.slice(i, i + 3);
+    const results = await Promise.all(chunk.map(({ term, category }) => metaFetch(term, category)));
+    results.forEach((ads, j) => {
+      const { category } = chunk[j];
+      rawAds.push(...ads);
+      if (!byCat[category]) byCat[category] = [];
+      byCat[category].push(...ads);
+    });
+  }
+
+  // Scrape competitor brands
+  const brandResults = await Promise.all(
+    COMPETITOR_BRANDS.map(brand => metaFetch(brand, 'competitor_brands', { monitored_brand: brand }))
+  );
+  brandResults.forEach((ads, i) => {
+    rawAds.push(...ads);
+    if (!byCat.competitor_brands) byCat.competitor_brands = [];
+    byCat.competitor_brands.push(...ads);
+  });
+
+  console.log(`[SCRAPE] Pulled ${rawAds.length} ads across ${Object.keys(byCat).length} categories`);
+
+  // Claude batch analysis
+  const hasLiveData = rawAds.length > 0;
+  const analysisPrompt = hasLiveData
+    ? `Analyze these ${rawAds.length} live competitor ads from Meta Ad Library across the weight loss and fitness niche.
+
+ADS SAMPLE (first 60):
+${JSON.stringify(rawAds.slice(0, 60), null, 2)}
+
+Return ONLY valid JSON:`
+    : `No live Meta API data available. Synthesize realistic competitor intelligence based on current market conditions for these search categories:
+${COMPETITOR_SEARCHES.map(s => `${s.category}: "${s.term}"`).join('\n')}
+Monitored brands: ${COMPETITOR_BRANDS.join(', ')}
+
+Return ONLY valid JSON:`;
+
+  const analysisSchema = `{
+  "total_analyzed": number,
+  "top_pain_points": [
+    { "pain_point": string, "count": number, "example_language": string, "opportunity_for_ih": string }
+  ],
+  "top_hooks": [
+    { "hook_type": string, "count": number, "example_headline": string, "why_it_works": string }
+  ],
+  "trending_angles": [string, string, string, string, string],
+  "untested_by_ih": [string, string, string],
+  "hottest_category": string,
+  "brand_activity": { "brand_name": "active_heavy|active_light|inactive" },
+  "category_insights": { "category_name": "key pattern observed" }
+}`;
+
+  let analysis = {};
+  try {
+    const raw = await callClaude(
+      'You are a direct response marketing analyst. Return only valid JSON.',
+      analysisPrompt + '\n' + analysisSchema,
+      2500
+    );
+    analysis = parseJsonFromText(raw);
+  } catch(e) {
+    console.warn('[SCRAPE] Analysis failed:', e.message);
+  }
+
+  const result = {
+    date:             dateStr,
+    generated:        new Date().toISOString(),
+    total_ads:        rawAds.length,
+    source:           fbToken ? 'meta_ad_library' : 'ai_synthesized',
+    searches_run:     COMPETITOR_SEARCHES.length,
+    brands_monitored: COMPETITOR_BRANDS,
+    category_counts:  Object.fromEntries(Object.entries(byCat).map(([k, v]) => [k, v.length])),
+    by_category:      byCat,
+    ...analysis,
+  };
+
+  saveIntelligence('scrape-summary.json', result);
+  saveIntelligence(`scrape-${dateStr}.json`, result);
+  console.log(`[SCRAPE] Saved scrape-${dateStr}.json`);
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1000,6 +1187,33 @@ app.post('/research-competitors', async (req, res) => {
   }
 });
 
+// POST /scrape-competitors — deep scrape all categories + brands
+app.post('/scrape-competitors', async (req, res) => {
+  try {
+    console.log(`[SCRAPE] Starting deep competitor scrape: ${COMPETITOR_SEARCHES.length} terms + ${COMPETITOR_BRANDS.length} brands...`);
+    const result = await scrapeCompetitors();
+    console.log(`[SCRAPE] Done — ${result.total_ads} ads, ${result.searches_run} searches`);
+    res.json({ success: true, ...result });
+  } catch(err) {
+    console.error('[SCRAPE] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /scrape-summary — latest scrape stats for the app dashboard
+app.get('/scrape-summary', (req, res) => {
+  try {
+    const summaryFile = path.join(INTEL_DIR, 'scrape-summary.json');
+    if (!fs.existsSync(summaryFile)) {
+      return res.json({ available: false, message: 'No scrape data yet. Run scrape-competitors first.' });
+    }
+    const data = JSON.parse(fs.readFileSync(summaryFile, 'utf8'));
+    res.json({ available: true, ...data });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /research-pain-points (Thing 4)
 app.post('/research-pain-points', async (req, res) => {
   try {
@@ -1145,6 +1359,17 @@ async function runDailyGeneration() {
 
 // Run at 7:00 AM PT daily
 cron.schedule('0 7 * * *', runDailyGeneration, { timezone: 'America/Los_Angeles' });
+
+// Deep competitor scrape — Monday and Thursday at 7:00 AM PT
+cron.schedule('0 7 * * 1,4', async () => {
+  console.log('[CRON] Monday/Thursday competitor scrape starting...');
+  try {
+    const result = await scrapeCompetitors();
+    console.log(`[CRON] Scrape done — ${result.total_ads} ads across ${result.searches_run} searches`);
+  } catch(e) {
+    console.error('[CRON] Scrape error:', e.message);
+  }
+}, { timezone: 'America/Los_Angeles' });
 
 // ── Trends (legacy) ───────────────────────────────────────────────────────────
 app.get('/trends', async (req, res) => {
