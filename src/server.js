@@ -1035,7 +1035,8 @@ app.get('/health', (req, res) => {
   } catch(e) {}
 
   res.json({
-    status: 'ok', version: '5.0.0',
+    status: 'ok', version: '5.1.0',
+    scraper: { searches: COMPETITOR_SEARCHES.length, brands: COMPETITOR_BRANDS.length },
     static_assets: staticAssets,
     intelligence: intelFiles,
     api_keys: {
