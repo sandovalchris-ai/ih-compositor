@@ -1,5 +1,7 @@
 node_modules/
 *.zip
-*.png
 .env
 .DS_Store
+!public/static/*.png
+!public/static/*.webp
+!public/static/*.jpg

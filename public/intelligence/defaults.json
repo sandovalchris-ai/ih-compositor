@@ -1,0 +1,181 @@
+{
+  "competitors": {
+    "source": "curated-defaults",
+    "updated": "2026-05-10",
+    "ads": [
+      { "brand": "Competitor A", "headline": "Lose 10 lbs in 30 Days", "offer": "40% OFF", "angle": "transformation", "color": "#FF0000", "audience": "women 35-55", "cta": "Shop Now", "scroll_stop": "before/after side-by-side", "trigger": "aspiration" },
+      { "brand": "Competitor B", "headline": "Finally — A Workout That's Actually Fun", "offer": "Buy 1 Get 1", "angle": "fun/habit", "color": "#FF69B4", "audience": "busy moms", "cta": "Get Yours", "scroll_stop": "woman smiling while hooping", "trigger": "joy" },
+      { "brand": "Competitor C", "headline": "Menopause Weight? This Is The Fix", "offer": "Free Shipping", "angle": "hormonal", "color": "#9B59B6", "audience": "women 45-60", "cta": "Claim Now", "scroll_stop": "direct address of pain", "trigger": "validation" },
+      { "brand": "Competitor D", "headline": "Cortisol Belly Melter — 10 Min/Day", "offer": "3 Free Gifts", "angle": "cortisol", "color": "#E74C3C", "audience": "cortisol belly", "cta": "Grab Yours", "scroll_stop": "scientific framing", "trigger": "education" },
+      { "brand": "Competitor E", "headline": "Bad Knees? This Is Your Workout", "offer": "Risk-Free Trial", "angle": "objection-reversal", "color": "#27AE60", "audience": "joint pain", "cta": "Try It Free", "scroll_stop": "objection as headline", "trigger": "relief" }
+    ],
+    "patterns": {
+      "top_headline_structures": [
+        "[Pain Point] + [Timeframe] + [Result]",
+        "[Objection] + [Permission] + [Product]",
+        "[Number] + [Transformation] + [How]",
+        "[Audience Identity] + [This Was Made For You]",
+        "[Comparison] + [Result] — they tried everything, this worked"
+      ],
+      "top_color_combos": ["hot pink + white", "black + pink", "lavender + hot pink", "red + white", "purple + gold"],
+      "top_offers": ["3 Free Gifts ($247 value)", "70% Off + Free Shipping", "Buy 1 Get 3 Free", "Risk-Free Trial", "Birthday Sale Final Hours"],
+      "top_triggers": ["cortisol belly", "menopause weight", "bad knees", "busy mom no time", "postpartum pouch"],
+      "top_layouts": ["product hero + bundle row", "before/after split", "text dominant + product", "lifestyle + offer overlay", "clean white minimal"]
+    }
+  },
+  "pain_points": {
+    "source": "curated-defaults",
+    "updated": "2026-05-10",
+    "segments": [
+      {
+        "pain_point": "cortisol_belly",
+        "audience": "Women 35-55",
+        "exact_phrases": [
+          "I eat clean and still gain belly fat — my cortisol is through the roof",
+          "Stress is making me fat and I can't stop it",
+          "Why is all my weight going to my stomach now",
+          "I don't recognize my body anymore since I started this stressful job",
+          "Cortisol belly is real and nothing fixes it"
+        ],
+        "emotional_core": "Feeling betrayed by their own body despite doing everything right",
+        "already_tried": ["keto", "intermittent fasting", "HIIT", "cutting calories"],
+        "wish_existed": "Something that actually targets belly fat specifically, not just general weight loss",
+        "headline_options": [
+          "Your cortisol belly isn't your fault — here's what actually works",
+          "Doing everything right but still gaining belly fat? This is why",
+          "Cortisol belly melts differently — here's the fix",
+          "The stress-belly cycle ends here",
+          "10 minutes a day melts cortisol belly — science says so"
+        ]
+      },
+      {
+        "pain_point": "menopause_weight",
+        "audience": "Women 45-65",
+        "exact_phrases": [
+          "Menopause completely changed my body and I don't recognize myself",
+          "I gained 20 lbs in a year and didn't change anything I eat",
+          "My doctor says it's just hormones — great, thanks, so what do I DO",
+          "Everything that used to work doesn't work anymore since menopause",
+          "I'm not even eating that much and I keep gaining weight"
+        ],
+        "emotional_core": "Loss of control over body they once knew how to manage",
+        "already_tried": ["HRT", "yoga", "walking", "diet changes", "every supplement"],
+        "wish_existed": "A workout that works WITH hormonal changes, not against them",
+        "headline_options": [
+          "Menopause changed your body — your workout needs to change too",
+          "This is why nothing worked before — and what changes everything",
+          "The only workout designed for the menopausal body",
+          "500,000 women over 45 finally found what works",
+          "Your hormones changed — this is the workout that works WITH them"
+        ]
+      },
+      {
+        "pain_point": "busy_mom",
+        "audience": "Moms 28-45",
+        "exact_phrases": [
+          "I have zero time to work out — I'm a mom",
+          "By the time kids are in bed I have no energy left",
+          "I can't afford a gym and can't leave the house",
+          "I just want something I can do while watching TV",
+          "I lost myself after having kids and I want my body back"
+        ],
+        "emotional_core": "Guilt + exhaustion + desire to be themselves again, not just 'mom'",
+        "already_tried": ["YouTube workouts they quit", "gym memberships they stopped using", "diets that failed"],
+        "wish_existed": "Something that fits into real mom life — no commute, no schedule, no equipment",
+        "headline_options": [
+          "10 minutes while the kids sleep — that's all this takes",
+          "The at-home workout busy moms are actually doing",
+          "You don't have time NOT to try this",
+          "Watch TV. Lose weight. That's it.",
+          "For moms who have no time but still want their body back"
+        ]
+      },
+      {
+        "pain_point": "bad_knees",
+        "audience": "Women 40-65 with joint issues",
+        "exact_phrases": [
+          "Every workout hurts my knees — I can't do anything",
+          "I want to lose weight but high impact is out of the question",
+          "My doctor said no running, no jumping — so now what",
+          "I'm too young to feel this broken",
+          "Joint pain stopped my weight loss journey completely"
+        ],
+        "emotional_core": "Feeling trapped — want to get healthy but body won't cooperate",
+        "already_tried": ["swimming (inconvenient)", "walking (too slow)", "yoga (boring)", "PT"],
+        "wish_existed": "Something effective that doesn't hurt their joints AT ALL",
+        "headline_options": [
+          "Bad knees? This is the one workout your joints can handle",
+          "Zero impact. Zero joint pain. Real results.",
+          "Finally — a workout for women who can't do high impact",
+          "Your knees said no to everything else. They'll say yes to this.",
+          "Low impact doesn't mean low results — proof inside"
+        ]
+      },
+      {
+        "pain_point": "postpartum_belly",
+        "audience": "Moms 25-40, postpartum",
+        "exact_phrases": [
+          "My stomach never went back after having kids",
+          "I hate this mom pouch — nothing gets rid of it",
+          "I lost the baby weight but my stomach still looks pregnant",
+          "FUPA from pregnancy is destroying my confidence",
+          "I can't wear anything I used to love"
+        ],
+        "emotional_core": "Identity crisis — body changed permanently and they grieve who they were",
+        "already_tried": ["crunches (hurt diastasis)", "diet (didn't touch belly)", "wraps", "shapewear"],
+        "wish_existed": "Something that specifically targets the lower belly, is safe for diastasis",
+        "headline_options": [
+          "Mom pouch met its match — 10 minutes a day",
+          "The postpartum belly exercise doctors actually recommend",
+          "From mom pouch to flat stomach in 28 days",
+          "Diastasis-safe. Results guaranteed. This is the workout.",
+          "Your baby is a year old. Your belly doesn't have to stay."
+        ]
+      }
+    ]
+  },
+  "ih_winner_dna": {
+    "source": "curated-defaults",
+    "updated": "2026-05-10",
+    "winning_headlines": [
+      "70% OFF — Today Only",
+      "Buy 1 Hoop Get 3 FREE Gifts ($247 Value)",
+      "Melt Belly Fat In 30 Days",
+      "The Workout You'll Actually Do Every Day",
+      "Hormonal Belly? This Was Made For You",
+      "500,000 Women Can't Be Wrong",
+      "Bad Knees? This Is The One Workout You Can Do",
+      "Watch TV. Lose Weight. That's It."
+    ],
+    "winning_offers": [
+      { "offer": "Buy 1 Get 3 Free (belt + cream + tea)", "note": "Best performer — $247 perceived value" },
+      { "offer": "70% Off + Free Shipping", "note": "Strong urgency, best for cold traffic" },
+      { "offer": "Birthday Sale — Final Hours", "note": "Urgency + scarcity" }
+    ],
+    "winning_layouts": [
+      { "name": "ih-bundle", "description": "Hoop hero + 3 gift cards row + CTA — highest converting" },
+      { "name": "editorial", "description": "Social proof + headline + hoop left + bundle right" },
+      { "name": "seasonal", "description": "Banner + headline + hoop center + 4 benefit circles" }
+    ],
+    "winning_colors": [
+      { "bg": "#F5E4F2", "accent": "#FF2D87", "note": "Lavender/hot pink — top for women 35-55" },
+      { "bg": "#FFFFFF", "accent": "#FF2D55", "note": "Clean white — editorial" },
+      { "bg": "#000000", "accent": "#FF2D55", "note": "Dark — scroll-stopping" }
+    ],
+    "winning_audiences": ["cortisol belly women 35-55", "menopause women 45-65", "busy moms 28-45", "bad knees 40-65", "postpartum 25-40"],
+    "emotional_angles": [
+      "Permission: This is not your fault — it's hormonal",
+      "Reversal: Bad knees? This is the one workout you can do",
+      "Social proof: 500,000 women already did this",
+      "Urgency: Final hours — sale ends at midnight",
+      "Transformation: From hiding my stomach to crop tops in 28 days"
+    ],
+    "scroll_stop_elements": [
+      "Direct address of specific pain point in headline",
+      "Before/after promise in first 5 words",
+      "Specific number (500,000 / 30 days / 70% off)",
+      "Objection as headline",
+      "Bundle value anchor ($247 → free)"
+    ]
+  }
+}

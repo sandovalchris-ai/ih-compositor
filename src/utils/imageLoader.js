@@ -1,5 +1,6 @@
 const sharp = require('sharp');
 const axios = require('axios');
+const fs    = require('fs');
 
 async function loadImageBuffer(source) {
   if (!source) return null;
@@ -15,6 +16,11 @@ async function loadImageBuffer(source) {
       timeout: 15000,
     });
     return Buffer.from(response.data);
+  }
+
+  // Filesystem path (absolute or relative)
+  if (source.startsWith('/') || source.startsWith('./') || source.startsWith('../')) {
+    return fs.readFileSync(source);
   }
 
   // Raw base64

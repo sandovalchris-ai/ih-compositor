@@ -19,7 +19,7 @@ const {
   F, renderTextLayer, drawRoundedRect, drawStar,
   drawSocialProof, drawLogo, drawCTA, wrapText, fitFontSize,
 } = require('../utils/textRenderer');
-const { loadLogo } = require('../utils/logoLoader');
+const { loadLogo, bgIsDark } = require('../utils/logoLoader');
 
 const W = 1080, H = 1350, PAD = 44;
 
@@ -75,7 +75,7 @@ function seededRng(seed) {
 }
 
 async function render({ products, text, colors, dna, variation_id = 1 }) {
-  const logo = await loadLogo(W, 60);
+  const logo = await loadLogo(W, { maxHeight: 55, dark: bgIsDark(colors.background) });
 
   // Resolve DNA with safe defaults
   const d = {
@@ -371,7 +371,7 @@ async function render({ products, text, colors, dna, variation_id = 1 }) {
   if (logo) {
     composites.push({
       input: logo.buffer,
-      top:   10,
+      top:   Math.round(30 - logo.height / 2),
       left:  Math.round((W - logo.width) / 2),
     });
   }

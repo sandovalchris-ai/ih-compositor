@@ -7,7 +7,7 @@
 const sharp = require('sharp');
 const { loadImageBuffer, resizeContain, removeBackground } = require('../utils/imageLoader');
 const { F, renderTextLayer, drawRoundedRect, drawLogo, wrapText, fitFontSize } = require('../utils/textRenderer');
-const { loadLogo } = require('../utils/logoLoader');
+const { loadLogo } = require('../utils/logoLoader'); // placed on white below red banner — no invert needed
 
 const W = 1080, H = 1350, PAD = 55;
 
@@ -17,7 +17,7 @@ function stripEmoji(str) {
 
 async function render({ products, text, colors }) {
   const bannerColor = colors.badge_bg || '#CC1111';
-  const logo        = await loadLogo(W, 55);
+  const logo        = await loadLogo(W, { maxHeight: 55, dark: false });
 
   // BG with gray zone and benefit circles pre-drawn
   const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
@@ -202,7 +202,7 @@ async function render({ products, text, colors }) {
   if (detoxBuf) composites.push({ input: detoxBuf, top: rowY,    left: detoxLeft });
   composites.push({ input: textBuf, top: 0, left: 0 });
   if (logo) {
-    // Place logo just below the red top banner, centered
+    // Place logo just below the red top banner, centered at y=30 relative to below-banner area
     composites.push({
       input: logo.buffer,
       top:   96,

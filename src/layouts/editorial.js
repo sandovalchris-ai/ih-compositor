@@ -6,7 +6,7 @@
 const sharp = require('sharp');
 const { loadImageBuffer, resizeContain, removeBackground } = require('../utils/imageLoader');
 const { F, renderTextLayer, drawRoundedRect, drawLogo, wrapText, fitFontSize } = require('../utils/textRenderer');
-const { loadLogo } = require('../utils/logoLoader');
+const { loadLogo } = require('../utils/logoLoader'); // always white bg — no invert needed
 
 const W = 1080, H = 1350, PAD = 55;
 
@@ -15,7 +15,7 @@ function stripEmoji(str) {
 }
 
 async function render({ products, text, colors }) {
-  const logo = await loadLogo(W, 60);
+  const logo = await loadLogo(W, { maxHeight: 55, dark: false });
 
   // BG — pure white
   const bgBuf = await sharp({
@@ -160,7 +160,7 @@ async function render({ products, text, colors }) {
   if (logo) {
     composites.push({
       input: logo.buffer,
-      top:   10,
+      top:   Math.round(30 - logo.height / 2),
       left:  Math.round((W - logo.width) / 2),
     });
   }

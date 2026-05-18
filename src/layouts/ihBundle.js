@@ -6,7 +6,7 @@
 const sharp = require('sharp');
 const { loadImageBuffer, removeBackground } = require('../utils/imageLoader');
 const { F, renderTextLayer, drawRoundedRect } = require('../utils/textRenderer');
-const { loadLogo } = require('../utils/logoLoader');
+const { loadLogo } = require('../utils/logoLoader'); // always light bg — no invert needed
 
 const W = 960, H = 1220;
 
@@ -33,7 +33,7 @@ async function render({ products, text, colors }) {
   const accent  = colors.badge_bg || colors.accent || '#FF2D87';
   const bgTop   = '#F0E6FF';
   const bgBot   = '#FAF0FF';
-  const logo    = await loadLogo(W, 50);
+  const logo    = await loadLogo(W, { maxHeight: 55, dark: false });
 
   async function loadClean(src, w, h) {
     if (!src) return null;
@@ -190,7 +190,7 @@ async function render({ products, text, colors }) {
   if (logo) {
     composites.push({
       input: logo.buffer,
-      top:   6,
+      top:   Math.round(30 - logo.height / 2),
       left:  Math.round((W - logo.width) / 2),
     });
   }
