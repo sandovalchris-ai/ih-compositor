@@ -773,6 +773,15 @@ app.get('/health', (req, res) => {
 // GET /layouts
 app.get('/layouts', (req, res) => res.json({ layouts: getLayouts() }));
 
+// GET /static/logo.png — serves src/assets/logo.png (falls through to express.static otherwise)
+app.get('/static/logo.png', (req, res) => {
+  const logoPath = path.join(__dirname, 'assets/logo.png');
+  if (!fs.existsSync(logoPath)) return res.status(404).json({ error: 'Logo not uploaded yet. POST a PNG to src/assets/logo.png on the server.' });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(logoPath).pipe(res);
+});
+
 // POST /composite (legacy)
 app.post('/composite', async (req, res) => {
   try {

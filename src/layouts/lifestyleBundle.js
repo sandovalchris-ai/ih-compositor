@@ -19,6 +19,7 @@ const {
   F, renderTextLayer, drawRoundedRect, drawStar,
   drawSocialProof, drawLogo, drawCTA, wrapText, fitFontSize,
 } = require('../utils/textRenderer');
+const { loadLogo } = require('../utils/logoLoader');
 
 const W = 1080, H = 1350, PAD = 44;
 
@@ -74,6 +75,8 @@ function seededRng(seed) {
 }
 
 async function render({ products, text, colors, dna, variation_id = 1 }) {
+  const logo = await loadLogo(W, 60);
+
   // Resolve DNA with safe defaults
   const d = {
     background_type:       dna?.background_type                  || 'gradient',
@@ -178,8 +181,8 @@ async function render({ products, text, colors, dna, variation_id = 1 }) {
       ctx.restore();
     }
 
-    // ── Logo — top center (fixed) ────────────────────────────────────────────
-    drawLogo(ctx, W, 38, { color: '#888888', opacity: 0.8 });
+    // ── Logo — image if available, text fallback ─────────────────────────────
+    if (!logo) drawLogo(ctx, W, 38, { color: '#888888', opacity: 0.8 });
 
     // ── Social proof — top ───────────────────────────────────────────────────
     if (d.social_proof_position === 'top') {
@@ -364,6 +367,14 @@ async function render({ products, text, colors, dna, variation_id = 1 }) {
   });
 
   composites.push({ input: textBuf, top: 0, left: 0 });
+
+  if (logo) {
+    composites.push({
+      input: logo.buffer,
+      top:   10,
+      left:  Math.round((W - logo.width) / 2),
+    });
+  }
 
   return sharp(bgBuf).composite(composites).png().toBuffer();
 }
