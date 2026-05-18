@@ -108,6 +108,44 @@ async function callClaude(systemPrompt, userPrompt, maxTokens = 4096) {
   return d.content?.[0]?.text || '';
 }
 
+async function callClaudeVision(systemPrompt, imageDataUri, textPrompt, maxTokens = 2000) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
+
+  let imageBase64 = imageDataUri;
+  let mediaType   = 'image/jpeg';
+  if (imageDataUri.startsWith('data:')) {
+    const [header, data] = imageDataUri.split(',');
+    imageBase64 = data;
+    mediaType   = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+  }
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+          { type: 'text',  text: textPrompt },
+        ],
+      }],
+    }),
+  });
+
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(`Claude Vision API ${r.status}: ${err.slice(0, 200)}`);
+  }
+  const d = await r.json();
+  return d.content?.[0]?.text || '';
+}
+
 function parseJsonFromText(text) {
   // Try to extract JSON array or object from Claude response
   const arrayMatch = text.match(/\[[\s\S]*\]/);
@@ -274,6 +312,51 @@ Find the patterns that repeat across the winners. Return ONLY valid JSON (no mar
 
   saveIntelligence(`competitors-${dateStr}.json`, result);
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPETITOR IMAGE ADAPTATION PIPELINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function adaptCompetitorImage(imageDataUri) {
+  console.log('[COMPETITOR] Running Claude Vision analysis...');
+
+  const visionPrompt = `Analyze this competitor fitness/weight loss ad and extract its psychological blueprint.
+
+Return ONLY valid JSON — no markdown, no explanation:
+{
+  "hook_type": "urgency|social_proof|transformation|fear|curiosity|authority",
+  "pain_point": "belly fat|menopause|bad knees|busy mom|postpartum|low energy|back pain|confidence",
+  "pain_point_language": "exact headline or phrase used in the ad",
+  "layout_structure": {
+    "headline_position": "top|center|bottom",
+    "product_arrangement": "hero_center|left|right|scattered",
+    "background_style": "solid|gradient|lifestyle_photo|dark|light",
+    "dominant_color": "hex or color name"
+  },
+  "psychological_triggers": ["list each trigger used"],
+  "what_makes_it_work": "the core psychological mechanism in one sentence",
+  "audience_segment": "who specifically this targets",
+  "weakness": "what would make this ad more effective"
+}`;
+
+  let blueprint;
+  try {
+    const raw = await callClaudeVision(
+      'You are a direct response marketing analyst. Return only valid JSON.',
+      imageDataUri,
+      visionPrompt,
+      1000
+    );
+    blueprint = parseJsonFromText(raw);
+  } catch(e) {
+    throw new Error(`Vision analysis failed: ${e.message}`);
+  }
+
+  console.log(`[COMPETITOR] Blueprint: hook=${blueprint.hook_type} pain=${blueprint.pain_point}`);
+
+  const result = await runGenerationPipeline({ count: 25, competitorContext: blueprint });
+  return { blueprint, ...result };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -509,7 +592,7 @@ async function generateHiggsfieldBackground(prompt) {
 // THING 6 — CREATIVE GENERATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function runGenerationPipeline({ count = 5, painPoint = null, specificRequest = null }) {
+async function runGenerationPipeline({ count = 5, painPoint = null, specificRequest = null, competitorContext = null }) {
   const intel = loadIntelligence();
 
   // Build Claude prompt
@@ -542,9 +625,16 @@ Available hoop colors: pink, blue, teal, green, black, magenta — vary these ac
 
 RETURN ONLY A VALID JSON ARRAY. No markdown, no explanation, just the array.`;
 
+  const competitorBlock = competitorContext ? `COMPETITOR TO BEAT:
+${JSON.stringify(competitorContext, null, 2)}
+
+Mission: Use the same hook type (${competitorContext.hook_type}), same pain point using their exact language ("${competitorContext.pain_point_language}"), and a layout inspired by their structure — but execute it better in every way with IH's brand. Fix their weakness: ${competitorContext.weakness}.
+
+` : '';
+
   const userPrompt = specificRequest
     ? `Create 1 static ad concept for this specific request: "${specificRequest}". Return as JSON array with 1 object using the schema below.`
-    : `Intelligence Reports:
+    : `${competitorBlock}Intelligence Reports:
 COMPETITORS: ${JSON.stringify(intel.competitors?.patterns || intel.competitors, null, 2).slice(0, 2000)}
 
 PAIN POINTS: ${JSON.stringify((intel.pain_points?.segments || []).slice(0, painPoint ? 1 : 3), null, 2).slice(0, 2000)}
@@ -891,7 +981,16 @@ app.get('/test-ad', async (req, res) => {
 // POST /research-competitors (Thing 3)
 app.post('/research-competitors', async (req, res) => {
   try {
-    console.log('[RESEARCH] Starting competitor research...');
+    const { image } = req.body || {};
+
+    if (image) {
+      console.log('[RESEARCH] Competitor image received — running vision adaptation pipeline...');
+      const result = await adaptCompetitorImage(image);
+      console.log(`[RESEARCH] Adaptation done — ${result.count_succeeded || 0}/${result.count_requested || 25} ads generated`);
+      return res.json({ success: true, mode: 'image_adaptation', blueprint: result.blueprint, ads: result.ads, count_succeeded: result.count_succeeded, count_requested: result.count_requested });
+    }
+
+    console.log('[RESEARCH] Starting text-based competitor research...');
     const result = await doCompetitorResearch();
     console.log(`[RESEARCH] Competitor research done — ${result.ad_count} ads analyzed`);
     res.json({ success: true, ad_count: result.ad_count, source: result.source, competitors: { ads: result.ads, patterns: result.patterns }, file: `competitors-${result.generated.slice(0,10)}.json` });
