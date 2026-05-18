@@ -4,6 +4,7 @@ const layouts = {
   'seasonal':           require('./layouts/seasonal'),
   'editorial':          require('./layouts/editorial'),
   'lifestyle-headline': require('./layouts/lifestyleHeadline'),
+  'lifestyle-bundle':   require('./layouts/lifestyleBundle'),
   'winner-clone':       require('./layouts/winnerClone'),
   'before-after':       require('./layouts/beforeAfter'),
 };
@@ -14,6 +15,7 @@ const LAYOUT_DESCRIPTIONS = {
   'seasonal':           'Gradient/scene background — top badge banner, hoop left, headline + checkmark benefits + CTA right',
   'editorial':          'Light pink background — large headline, split product zone, long body copy, bold CTA text',
   'lifestyle-headline': 'Lifestyle photo full-bleed — white headline box, badge pill, product cutouts, callout labels',
+  'lifestyle-bundle':   'AI-cloned winner structure — products placed naturally (no card borders), dynamic arrangement driven by Claude Vision DNA, fixed $100 OFF + 3 FREE GIFTS offer',
   'winner-clone':       'Auto-detect layout from winner image; clone structure with new products, text, and variation type',
   'before-after':       'Split-screen transformation — greyscale before (left) vs. color after (right) + products; bottom strip headline + CTA',
 };
@@ -38,14 +40,15 @@ async function composite(params) {
 
   const normalized = {
     layout,
-    background:    params.background   || null,
-    products:      params.products     || {},
-    text:          params.text         || {},
-    assets:        params.assets       || null,
-    winnerImage:   params.winner_image || null,
+    background:    params.background    || null,
+    products:      params.products      || {},
+    text:          params.text          || {},
+    assets:        params.assets        || null,
+    winnerImage:   params.winner_image  || null,
     variationType: params.variation_type || null,
+    dna:           params.dna           || null,
     colors,
-    variation_id:  params.variation_id || 1,
+    variation_id:  params.variation_id  || 1,
   };
 
   return layoutModule.render(normalized);

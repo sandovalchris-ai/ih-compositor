@@ -378,7 +378,37 @@ async function analyzeWinnerImages(imageDataUris) {
               },
               {
                 type: 'text',
-                text: 'Analyze this Infinity Hoop static ad. Extract: headline_text, body_copy, offer_details, background_color_hex, accent_color_hex, layout_structure, emotional_trigger, pain_point_targeted, scroll_stop_element, conversion_factor. NOTE: The Infinity Hoop offer is always $100 OFF + 3 FREE GIFTS (Sweat Belt $29.99, Toning Cream $29.99, Detox Tea $29.99) = $189.97 total savings — note how this specific offer is framed visually, not what the offer amount is. Return ONLY valid JSON object.',
+                text: `Analyze this Infinity Hoop static ad. Return ONLY valid JSON with these fields:
+{
+  "headline_text": string,
+  "body_copy": string,
+  "background_color_hex": "#hex",
+  "accent_color_hex": "#hex",
+  "emotional_trigger": string,
+  "pain_point_targeted": string,
+  "scroll_stop_element": string,
+  "conversion_factor": string,
+  "offer_framing": "how the $100 OFF + 3 FREE GIFTS offer is shown visually",
+  "suggested_layout": "ih-bundle | editorial | seasonal | lifestyle-bundle",
+  "lifestyle_dna": {
+    "background_type": "solid | gradient",
+    "background_colors": { "primary": "#hex", "secondary": "#hex" },
+    "headline_position": "top | center",
+    "headline_style": "big_bold | mixed_weight | quote_style",
+    "product_arrangement": "hero_center | natural_scene | split | card",
+    "decorative_elements": "confetti | stars | ribbons | none",
+    "social_proof_position": "top | bottom | none"
+  }
+}
+
+For suggested_layout, pick:
+- "ih-bundle": white/lavender bg, products inside card boxes, classic grid layout
+- "editorial": giant bold headline dominates, products arranged left/right with arrow labels
+- "seasonal": radial/circular layout, benefit callouts around the hoop
+- "lifestyle-bundle": products float naturally with NO card borders, lifestyle or gradient scene, products arranged organically
+
+Only populate lifestyle_dna when suggested_layout is "lifestyle-bundle"; for others set it to null.
+NOTE: The IH offer is always $100 OFF + 3 FREE GIFTS ($189.97 total savings) — only describe how it is framed visually.`,
               },
             ],
           }],
@@ -398,7 +428,7 @@ ${JSON.stringify(analyses, null, 2)}
 
 IMPORTANT — The Infinity Hoop offer NEVER changes:
 $100 OFF the hoop + FREE Infinity Sweat Belt ($29.99) + FREE Infinity Toning Cream ($29.99) + FREE Infinity Detox Tea ($29.99) = $189.97 total savings.
-When listing winning_offers, document how this fixed offer is FRAMED and PRESENTED visually — not different offer amounts.
+When listing winning_offers, document only how this fixed offer is FRAMED visually — not different amounts.
 
 Synthesize these into the Infinity Hoop creative DNA. Find what REPEATS across the winners. Return ONLY valid JSON:
 {
@@ -409,8 +439,27 @@ Synthesize these into the Infinity Hoop creative DNA. Find what REPEATS across t
   "pain_points_addressed": ["list"],
   "emotional_triggers": ["list"],
   "scroll_stop_elements": ["list"],
-  "what_never_to_do": ["list of patterns that don't appear — what IH avoids"]
-}`;
+  "what_never_to_do": ["list of patterns that don't appear — what IH avoids"],
+  "layout_routing": {
+    "ih-bundle":        number,
+    "editorial":        number,
+    "seasonal":         number,
+    "lifestyle-bundle": number
+  },
+  "recommended_layout": "ih-bundle | editorial | seasonal | lifestyle-bundle",
+  "lifestyle_bundle_dna": {
+    "background_type": "solid | gradient",
+    "background_colors": { "primary": "#hex", "secondary": "#hex" },
+    "headline_position": "top | center",
+    "headline_style": "big_bold | mixed_weight | quote_style",
+    "product_arrangement": "hero_center | natural_scene | split | card",
+    "decorative_elements": "confetti | stars | ribbons | none",
+    "social_proof_position": "top | bottom | none"
+  }
+}
+
+For layout_routing: count how many of the analyzed ads map to each layout type.
+For lifestyle_bundle_dna: use the most common values across all lifestyle-bundle winners, or best-guess from the full set if none were lifestyle-bundle.`;
 
   let dna;
   try {
@@ -486,7 +535,7 @@ Each static must:
 - Drive to one action — claim the bundle now
 - Use colors proven to work in this market
 
-Available layouts: ih-bundle (960×1220, best for bundle with 3 gift cards), editorial (1080×1350, large hoop left + text right), seasonal (1080×1350, hoop center + 4 benefit circles)
+Available layouts: ih-bundle (960×1220, classic bundle with gift cards), editorial (1080×1350, large headline + split products), seasonal (1080×1350, hoop center + benefit circles), lifestyle-bundle (1080×1350, products placed naturally with no card borders — driven by dna object)
 Available background colors: #F5E4F2 (lavender-best), #FFFFFF (white), #000000 (black), #FFF5E6 (warm cream)
 Available accent/badge colors: #FF2D87 (hot pink-best), #FF2D55 (red-pink), #CC1111 (red), #111111 (black)
 Available hoop colors: pink, blue, teal, green, black, magenta — vary these across variations.
@@ -527,7 +576,20 @@ Create ${count} static ad concepts${painPoint ? ` focused on pain point: ${painP
   "higgsfield_background_prompt": string (describe a photo background: woman, setting, mood — for lifestyle overlay)
 }
 
-Do NOT include an "offer" field — the offer is hardcoded server-side as $100 OFF + 3 FREE GIFTS ($189.97 savings) and must not vary.`;
+Do NOT include an "offer" field — the offer is hardcoded server-side as $100 OFF + 3 FREE GIFTS ($189.97 savings) and must not vary.
+
+When layout is "lifestyle-bundle", also include a "dna" object:
+{
+  "background_type": "solid | gradient",
+  "background_colors": { "primary": "#hex", "secondary": "#hex" },
+  "headline_position": "top | center",
+  "headline_style": "big_bold | mixed_weight | quote_style",
+  "product_arrangement": "hero_center | natural_scene | split | card",
+  "decorative_elements": "confetti | stars | ribbons | none",
+  "social_proof_position": "top | bottom | none"
+}
+For other layouts, omit the dna field entirely.`;
+
 
   let briefs = [];
   try {
@@ -580,6 +642,7 @@ Do NOT include an "offer" field — the offer is hardcoded server-side as $100 O
               products: { ...products, ...extraProducts },
               text:     brief.text   || {},
               colors:   normalizedColors,
+              dna:      brief.dna    || null,
             });
 
             // Thing 7: Quality check
